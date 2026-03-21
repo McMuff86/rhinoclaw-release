@@ -1,0 +1,22 @@
+{
+  "connection": {
+    "host": "localhost",
+    "port": 1999,
+    "timeout": 15.0,
+    "max_retries": 3,
+    "retry_delay": 1.0
+  },
+  "defaults": {
+    "layer": "Default",
+    "color": [128, 128, 128]
+  },
+  "screenshots": {
+    "default_width": 1920,
+    "default_height": 1080,
+    "output_dir": "./captures"
+  },
+  "logging": {
+    "log_file": "rhinoclaw.log",
+    "tail_lines": 30
+  }
+}

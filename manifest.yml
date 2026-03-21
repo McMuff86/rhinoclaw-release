@@ -1,0 +1,40 @@
+name: rhinoclaw
+version: 0.2.3
+authors:
+  - Solid AI
+description: >
+  RhinoClaw — AI-powered Rhino 3D control via TCP/WebSocket.
+  Control Rhino with AI agents: 72 tools for geometry creation, transforms,
+  booleans, materials (PBR), viewport capture, Grasshopper integration,
+  and an embedded Chat panel for direct AI interaction inside Rhino 8.
+  
+  Features:
+  - Create & modify geometry (solids, surfaces, curves, meshes)
+  - Boolean operations (union, difference, intersection)
+  - Layer & material management (including PBR)
+  - Grasshopper definitions: load, set parameters, solve, bake
+  - GrasshopperPlayer automation with custom parameters
+  - Viewport screenshots & annotations
+  - Selection, groups, blocks, import/export
+  - Embedded Chat Panel with configurable AI backend
+  
+  Works with OpenClaw, Claude, Cursor, or any AI that supports
+  TCP/WebSocket communication. No cloud required – runs fully local.
+  
+  Developed by Solid AI – AI Agent Solutions for Manufacturing & Design.
+  Website: https://solid-ai.ai
+  Contact: info@solid-ai.ai
+keywords:
+  - rhinoclaw
+  - mcp
+  - rhino
+  - ai
+  - agents
+  - modelcontextprotocol
+  - grasshopper
+  - chatbot
+  - automation
+  - cad
+  - parametric
+  - manufacturing
+url: 'https://solid-ai.ai'
