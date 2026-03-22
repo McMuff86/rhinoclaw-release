@@ -1,8 +1,6 @@
-<!-- 
 <p align="center">
-  <img src="screenshots/rhinoclaw-logo.png" alt="RhinoClaw Logo" width="400"/>
+  <img src="screenshots/rhinoclaw-logo.png" alt="RhinoClaw Logo" width="300"/>
 </p>
--->
 
 <h1 align="center">🦏 RhinoClaw</h1>
 
