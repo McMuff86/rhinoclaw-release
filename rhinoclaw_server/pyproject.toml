@@ -37,8 +37,8 @@ build-backend = "setuptools.build_meta"
 package-dir = {"" = "src"}
 
 [project.urls]
-"Homepage" = "https://github.com/McMuff86/rhinoclaw-release"
-"Bug Tracker" = "https://github.com/McMuff86/rhinoclaw-release/issues"
+"Homepage" = "https://github.com/McMuff86/rhinoclaw"
+"Bug Tracker" = "https://github.com/McMuff86/rhinoclaw/issues"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
