@@ -10,7 +10,7 @@ def set_debug_mode_tool(ctx: Context, enable: bool) -> str:
         set_debug_mode(enable)
         # Also send command to Rhino to set debug mode there
         rhino = get_rhino_connection()
-        result = rhino.send_command("set_debug_mode", {"enable": enable})
+        rhino.send_command("set_debug_mode", {"enable": enable})
         return f"Debug mode {'enabled' if enable else 'disabled'}"
     except Exception as e:
         logger.error(f"Error setting debug mode: {str(e)}")

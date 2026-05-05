@@ -39,6 +39,7 @@ class TestCaptureViewportSuccess:
 
     @patch("rhinoclaw.tools.capture_viewport.get_rhino_connection")
     def test_capture_viewport_base64(self, mock_get_conn):
+        """When auto_save=False, filename stays None and base64 is returned."""
         from rhinoclaw.tools.capture_viewport import capture_viewport
 
         mock_conn = MagicMock()
@@ -46,7 +47,7 @@ class TestCaptureViewportSuccess:
         mock_get_conn.return_value = mock_conn
 
         ctx = MagicMock()
-        result = capture_viewport(ctx)
+        result = capture_viewport(ctx, auto_save=False)
         parsed = json.loads(result)
 
         assert parsed["success"] is True
@@ -61,6 +62,7 @@ class TestCaptureViewportSuccess:
 
     @patch("rhinoclaw.tools.capture_viewport.get_rhino_connection")
     def test_capture_viewport_to_file(self, mock_get_conn):
+        """Relative filenames are resolved into the screenshots/ directory."""
         from rhinoclaw.tools.capture_viewport import capture_viewport
 
         mock_conn = MagicMock()
@@ -73,15 +75,19 @@ class TestCaptureViewportSuccess:
 
         assert parsed["success"] is True
         assert "Perspective" in parsed["message"]
-        mock_conn.send_command.assert_called_once_with("capture_viewport", {
-            "viewport_name": "Perspective",
-            "width": 1024,
-            "height": 768,
-            "filename": "screenshot.png"
-        })
+        # Relative filename gets resolved to <project>/screenshots/screenshot.png
+        call_args = mock_conn.send_command.call_args
+        assert call_args[0][0] == "capture_viewport"
+        sent_params = call_args[0][1]
+        assert sent_params["viewport_name"] == "Perspective"
+        assert sent_params["width"] == 1024
+        assert sent_params["height"] == 768
+        assert sent_params["filename"].endswith("screenshot.png")
+        assert "screenshots" in sent_params["filename"]
 
     @patch("rhinoclaw.tools.capture_viewport.get_rhino_connection")
     def test_capture_viewport_custom_viewport(self, mock_get_conn):
+        """Auto-save (default) generates a timestamped filename in screenshots/."""
         from rhinoclaw.tools.capture_viewport import capture_viewport
 
         mock_conn = MagicMock()
@@ -93,12 +99,15 @@ class TestCaptureViewportSuccess:
         parsed = json.loads(result)
 
         assert parsed["success"] is True
-        mock_conn.send_command.assert_called_once_with("capture_viewport", {
-            "viewport_name": "Top",
-            "width": 1920,
-            "height": 1080,
-            "filename": None
-        })
+        call_args = mock_conn.send_command.call_args
+        sent_params = call_args[0][1]
+        assert sent_params["viewport_name"] == "Top"
+        assert sent_params["width"] == 1920
+        assert sent_params["height"] == 1080
+        # Auto-generated filename pattern: viewport_Top_<timestamp>.png in screenshots dir
+        assert sent_params["filename"] is not None
+        assert "viewport_Top_" in sent_params["filename"]
+        assert sent_params["filename"].endswith(".png")
 
 
 class TestCaptureViewportError:

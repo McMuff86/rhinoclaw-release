@@ -43,9 +43,16 @@ def create_group(
             "group_name": name
         })
 
+        # Enrich response with derived fields for stable schema across clients.
+        data = dict(result)
+        data["object_count"] = len(object_ids)
+        if name and "name" not in data:
+            data["name"] = name
+
+        group_label = data.get("name") or "unnamed group"
         return json.dumps(ok(
-            message=f"Created group with {len(object_ids)} objects",
-            data=result
+            message=f"Created group '{group_label}' with {len(object_ids)} objects",
+            data=data
         ))
     except Exception as e:
         logger.error(f"Error creating group: {str(e)}")

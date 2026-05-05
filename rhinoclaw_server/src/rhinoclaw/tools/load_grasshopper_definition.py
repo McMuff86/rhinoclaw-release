@@ -6,7 +6,6 @@ providing programmatic access to parameters without opening the Grasshopper UI.
 """
 
 import json
-from typing import Optional
 
 from mcp.server.fastmcp import Context
 

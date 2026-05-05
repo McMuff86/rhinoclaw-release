@@ -1,5 +1,4 @@
 import json
-from typing import Optional
 
 from mcp.server.fastmcp import Context
 

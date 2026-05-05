@@ -1,10 +1,10 @@
 name: rhinoclaw
-version: 0.2.5
+version: 0.4.1
 authors:
   - Solid AI
 description: >
   RhinoClaw — AI-powered Rhino 3D control via TCP/WebSocket.
-  Control Rhino with AI agents: 74 tools for geometry creation, transforms,
+  Control Rhino with AI agents: 80+ tools for geometry creation, transforms,
   booleans, materials (PBR), viewport capture, Grasshopper integration,
   Python 3 (CPython) script execution, and an embedded Chat panel for
   direct AI interaction inside Rhino 8.
@@ -25,6 +25,7 @@ description: >
   Developed by Solid AI – AI Agent Solutions for Manufacturing & Design.
   Website: https://solid-ai.ai
   Contact: info@solid-ai.ai
+icon: icon.png
 keywords:
   - rhinoclaw
   - mcp

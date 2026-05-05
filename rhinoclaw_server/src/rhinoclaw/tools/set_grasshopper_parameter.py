@@ -6,7 +6,7 @@ without using the interactive GrasshopperPlayer approach.
 """
 
 import json
-from typing import Any, Optional, Union
+from typing import Union
 
 from mcp.server.fastmcp import Context
 

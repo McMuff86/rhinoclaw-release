@@ -1,5 +1,4 @@
 import json
-from typing import List
 
 from mcp.server.fastmcp import Context
 
@@ -39,9 +38,17 @@ def ungroup(
             "group_id": group_id
         })
 
+        # Normalize plugin response: prefer object_count, fall back to objects_released.
+        data = dict(result)
+        if "object_count" not in data and "objects_released" in data:
+            # Plugin returns total released across all groups; expose as object_count
+            # of the (single) group operated on.
+            data["object_count"] = data["objects_released"] // max(data.get("groups_ungrouped", 1), 1)
+        data.setdefault("groups_ungrouped", 1)
+
         return json.dumps(ok(
-            message=f"Ungrouped group with {result.get('object_count', 0)} objects",
-            data=result
+            message=f"Ungrouped group with {data.get('object_count', 0)} objects",
+            data=data
         ))
     except Exception as e:
         logger.error(f"Error ungrouping: {str(e)}")

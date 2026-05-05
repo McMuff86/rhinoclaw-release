@@ -69,7 +69,7 @@ def offset_curve(
         })
         
         return json.dumps(ok(
-            message=f"Offset curve created",
+            message="Offset curve created",
             data=result
         ))
     except Exception as e:

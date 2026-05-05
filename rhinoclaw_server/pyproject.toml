@@ -1,6 +1,6 @@
 [project]
 name = "rhinoclaw"
-version = "0.1.3.9"
+version = "0.4.1"
 description = "Rhino integration through the Model Context Protocol"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,9 +37,29 @@ build-backend = "setuptools.build_meta"
 package-dir = {"" = "src"}
 
 [project.urls]
-"Homepage" = "https://github.com/McMuff86/rhinoclaw"
-"Bug Tracker" = "https://github.com/McMuff86/rhinoclaw/issues"
+"Homepage" = "https://github.com/McMuff86/rhinoclaw-release"
+"Bug Tracker" = "https://github.com/McMuff86/rhinoclaw-release/issues"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+# Keep ruleset conservative for now; expand (I, UP, B) once codebase settles.
+select = ["E", "F", "W"]
+ignore = [
+    "E501",  # line too long — long docstring tables are common
+    "E701",  # multiple statements on one line — used for compact param flattening
+    "W291",  # trailing whitespace — pre-existing, will sweep separately
+    "W293",  # blank line whitespace — pre-existing
+]
+
+[tool.ruff.lint.per-file-ignores]
+# __init__.py re-exports tool modules so FastMCP picks up @mcp.tool() decorators.
+# Imports look "unused" but are required side-effects.
+"src/rhinoclaw/__init__.py" = ["F401"]
+"tests/**" = ["F401", "F841"]
