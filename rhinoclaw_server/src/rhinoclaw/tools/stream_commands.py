@@ -14,7 +14,6 @@ Usage Flow:
     4. disconnect_rhino_stream() - Cleanup when done
 """
 
-import asyncio
 import json
 from typing import Optional
 
@@ -151,7 +150,7 @@ async def send_rhino_input(
         if success:
             logger.info(f"Sent input: {value}")
             return json.dumps(ok(
-                message=f"Input sent successfully",
+                message="Input sent successfully",
                 data={
                     "sent": True,
                     "value": value,
@@ -235,7 +234,7 @@ async def wait_for_prompt(
             ))
         else:
             return json.dumps(ok(
-                message=f"Timeout waiting for prompt",
+                message="Timeout waiting for prompt",
                 data={
                     "matched": False,
                     "timeout": True,

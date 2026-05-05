@@ -1,11 +1,10 @@
-import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from mcp.server.fastmcp import Context
 
 from rhinoclaw.server import get_rhino_connection, logger, mcp
 from rhinoclaw.utils.errors import ErrorCode
-from rhinoclaw.utils.responses import from_exception, ok
+from rhinoclaw.utils.responses import from_exception
 
 
 @mcp.tool()

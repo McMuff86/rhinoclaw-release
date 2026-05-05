@@ -38,9 +38,16 @@ def explode_block(
             "instance_id": instance_id
         })
 
+        # Normalize: expose both the count of objects produced and how many
+        # instances were exploded (always 1 for this single-instance tool).
+        data = dict(result)
+        data.setdefault("instances_exploded", 1)
+        if "object_count" not in data and "objects_created" in data:
+            data["object_count"] = data["objects_created"] // max(data["instances_exploded"], 1)
+
         return json.dumps(ok(
-            message=f"Exploded block instance to geometry",
-            data=result
+            message="Exploded block instance to geometry",
+            data=data
         ))
     except Exception as e:
         logger.error(f"Error exploding block: {str(e)}")

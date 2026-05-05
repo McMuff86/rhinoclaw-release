@@ -6,7 +6,6 @@ based on the current parameter values.
 """
 
 import json
-from typing import Optional
 
 from mcp.server.fastmcp import Context
 

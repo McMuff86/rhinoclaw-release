@@ -86,7 +86,8 @@ class TestUngroup:
 
         mock_rhino = MagicMock()
         mock_rhino.send_command.return_value = {
-            "objects_released": 6
+            "objects_released": 6,
+            "groups_ungrouped": 2,
         }
         mock_get_conn.return_value = mock_rhino
 
@@ -100,6 +101,7 @@ class TestUngroup:
         assert parsed["success"] is True
         assert "Ungrouped group with 3 objects" in parsed["message"]
         assert parsed["data"]["object_count"] == 3
+        assert parsed["data"]["groups_ungrouped"] == 2
 
     @patch("rhinoclaw.tools.ungroup.get_rhino_connection")
     def test_ungroup_success_single_group(self, mock_get_conn):
@@ -250,7 +252,7 @@ class TestInsertBlock:
 
         assert parsed["success"] is True
         assert "MyBlock" in parsed["message"]
-        assert "[10, 20, 30]" in parsed["message"]
+        # Position/scale/rotation are exposed via data, not the message string.
         assert parsed["data"]["instance_id"] == "instance-123"
         assert parsed["data"]["block_name"] == "MyBlock"
         assert parsed["data"]["position"] == [10, 20, 30]
@@ -333,7 +335,8 @@ class TestExplodeBlock:
 
         mock_rhino = MagicMock()
         mock_rhino.send_command.return_value = {
-            "objects_created": 6
+            "objects_created": 6,
+            "instances_exploded": 2,
         }
         mock_get_conn.return_value = mock_rhino
 
@@ -347,6 +350,7 @@ class TestExplodeBlock:
         assert parsed["success"] is True
         assert "Exploded block instance to geometry" in parsed["message"]
         assert parsed["data"]["object_count"] == 3
+        assert parsed["data"]["instances_exploded"] == 2
 
     @patch("rhinoclaw.tools.explode_block.get_rhino_connection")
     def test_explode_block_success_single_instance(self, mock_get_conn):

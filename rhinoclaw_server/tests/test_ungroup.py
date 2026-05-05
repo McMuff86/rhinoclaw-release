@@ -52,7 +52,8 @@ class TestUngroupSuccess:
         parsed = json.loads(result)
 
         assert parsed["success"] is True
-        assert "Ungrouped objects" in parsed["message"]
+        assert "Ungrouped group" in parsed["message"]
+        assert "3 objects" in parsed["message"]
         assert parsed["data"]["object_ids"] == ["obj1", "obj2", "obj3"]
         assert parsed["data"]["object_count"] == 3
 

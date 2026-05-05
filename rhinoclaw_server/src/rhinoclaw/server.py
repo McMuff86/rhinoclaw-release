@@ -1,22 +1,25 @@
 # rhinoclaw_server.py
-import asyncio
 import json
 import logging
 import socket
 import time
+import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Dict, List
+from typing import Any, AsyncIterator, Dict, Optional
 
-from mcp.server.fastmcp import Context, FastMCP, Image
+from mcp.server.fastmcp import FastMCP
 
-# Configure logging
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+from rhinoclaw.config import get_settings
+from rhinoclaw.logging_setup import configure_logging
+
+# Configure logging according to settings (text or JSON format).
+_settings = get_settings()
+configure_logging(_settings)
 logger = logging.getLogger("RhinoClawServer")
 
-# Global debug flag
-_debug_mode = True
+# Runtime debug flag — initialised from settings, toggleable via set_debug_mode tool.
+_debug_mode = _settings.debug
 
 def set_debug_mode(enable: bool):
     """Enable or disable debug mode"""
@@ -109,8 +112,8 @@ class RhinoConnection:
     def receive_full_response(self, sock, buffer_size=8192):
         """Receive the complete response, potentially in multiple chunks"""
         chunks = []
-        # Use a consistent timeout value that matches the addon's timeout
-        sock.settimeout(15.0)  # Match the addon's timeout
+        # Match the per-call timeout configured for this connection.
+        sock.settimeout(get_settings().timeout_seconds)
         
         try:
             while True:
@@ -164,15 +167,30 @@ class RhinoConnection:
 
     def _execute_command(self, command_type: str, params: Dict[str, Any], timeout: float = 15.0) -> Dict[str, Any]:
         """Internal method to execute a command (no retry logic)"""
-        command = {
+        request_id = uuid.uuid4().hex[:8]
+        command: Dict[str, Any] = {
             "type": command_type,
-            "params": params or {}
+            "params": params or {},
+            "request_id": request_id,
         }
-        
+
+        # Inject auth token if the env-var is set; the plugin enforces it
+        # only when it has a token of its own configured.
+        settings = get_settings()
+        if settings.auth_token:
+            command["auth"] = settings.auth_token
+
+        log_extra = {"request_id": request_id, "tool": command_type}
         if _debug_mode:
-            logger.debug(f"Sending command: {command_type} with params: {json.dumps(params, indent=2)}")
+            logger.debug(
+                f"Sending command: {command_type} with params: {json.dumps(params, indent=2)}",
+                extra=log_extra,
+            )
         else:
-            logger.info(f"Sending command: {command_type} with params: {params}")
+            logger.info(
+                f"Sending command: {command_type}",
+                extra=log_extra,
+            )
 
         if self.sock is None:
             raise ConnectionError("Socket is not connected")
@@ -199,18 +217,23 @@ class RhinoConnection:
 
         return response.get("result", {})
 
-    def send_command(self, command_type: str, params: Dict[str, Any] = {}, timeout: float = 15.0) -> Dict[str, Any]:
+    def send_command(self, command_type: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None) -> Dict[str, Any]:
         """
         Send a command to Rhino with automatic reconnection on failure.
-        
+
         Args:
             command_type: The command to execute
             params: Command parameters
-            timeout: Response timeout in seconds (default: 15.0, max: 120.0)
+            timeout: Response timeout in seconds. Defaults to settings.timeout_seconds,
+                clamped to [1.0, settings.max_timeout_seconds].
         """
         from rhinoclaw.utils.interaction_logger import interaction_logger
-        
-        timeout = min(max(timeout, 1.0), 120.0)
+
+        params = params if params is not None else {}
+        settings = get_settings()
+        if timeout is None:
+            timeout = settings.timeout_seconds
+        timeout = min(max(timeout, 1.0), settings.max_timeout_seconds)
         start_time = time.time()
         
         if not self.sock and not self.connect():
@@ -348,7 +371,7 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
         # Try to connect to Rhino on startup to verify it's available
         try:
             # This will initialize the global connection if needed
-            rhino = get_rhino_connection()
+            get_rhino_connection()
             logger.info("Successfully connected to Rhino on startup")
         except Exception as e:
             logger.warning(f"Could not connect to Rhino on startup: {str(e)}")
@@ -379,16 +402,20 @@ _rhino_connection = None
 def get_rhino_connection():
     """Get or create a persistent Rhino connection"""
     global _rhino_connection
-    
+
     # Create a new connection if needed
     if _rhino_connection is None:
-        _rhino_connection = RhinoConnection(host="127.0.0.1", port=1999)
+        settings = get_settings()
+        _rhino_connection = RhinoConnection(host=settings.host, port=settings.port)
         if not _rhino_connection.connect():
             logger.error("Failed to connect to Rhino")
             _rhino_connection = None
-            raise Exception("Could not connect to Rhino. Make sure the Rhino addon is running.")
+            raise Exception(
+                f"Could not connect to Rhino at {settings.host}:{settings.port}. "
+                "Make sure the Rhino addon is running (mcpstart or tcpstart)."
+            )
         logger.info("Created new persistent connection to Rhino")
-    
+
     return _rhino_connection
 
 # Main execution

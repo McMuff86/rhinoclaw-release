@@ -79,7 +79,7 @@ def extrude_curve(
         result = rhino.send_command("extrude_curve", params)
         
         return json.dumps(ok(
-            message=f"Curve extruded successfully",
+            message="Curve extruded successfully",
             data=result
         ))
     except Exception as e:

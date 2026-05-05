@@ -1,6 +1,6 @@
 """Rhino integration through the Model Context Protocol."""
 
-__version__ = "0.1.3.9"
+__version__ = "0.2.9"
 
 # Expose key classes and functions for easier imports
 from .prompts.assert_general_strategy import asset_general_strategy
@@ -9,6 +9,7 @@ from .static.rhinoscriptsyntax import rhinoscriptsyntax_json
 from .tools.array_linear import array_linear
 from .tools.array_polar import array_polar
 from .tools.assign_material_to_layer import assign_material_to_layer
+from .tools.batch_operations import batch_operations
 from .tools.boolean_operation import boolean_operation
 from .tools.chamfer_curves import chamfer_curves
 from .tools.copy_object import copy_object
@@ -28,9 +29,13 @@ from .tools.execute_rhinoscript_python_code import execute_rhinoscript_python_co
 from .tools.export_file import export_file
 from .tools.extrude_curve import extrude_curve
 from .tools.fillet_curves import fillet_curves
+from .tools.find_nearby import find_nearby
+from .tools.find_objects import find_objects
+from .tools.get_auth_status import get_auth_status
 from .tools.get_document_info import get_document_info
 from .tools.get_logs import clear_logs, get_logs
 from .tools.get_object_info import get_object_info
+from .tools.get_relationships import get_relationships
 
 # Object Properties
 from .tools.get_object_properties import get_object_properties
@@ -50,7 +55,9 @@ from .tools.offset_curve import offset_curve
 # File Operations
 from .tools.open_file import open_file
 from .tools.ping import ping
+from .tools.redo import redo
 from .tools.revolve_curve import revolve_curve
+from .tools.run_native_command import run_native_command
 from .tools.save_file import save_file
 from .tools.select_objects import select_objects
 from .tools.set_debug_mode import set_debug_mode
@@ -68,9 +75,14 @@ from .tools.create_block import create_block
 from .tools.create_group import create_group
 from .tools.explode_block import explode_block
 from .tools.insert_block import insert_block
+from .tools.is_inside import is_inside
+from .tools.list_capabilities import list_capabilities
+from .tools.scene_summary import scene_summary
+from .tools.undo import undo
 from .tools.ungroup import ungroup
 
 # Grasshopper Operations
+from .tools.inspect_grasshopper_definition import inspect_grasshopper_definition
 from .tools.run_grasshopper import run_grasshopper
 from .tools.grasshopper_interactive import (
     run_door_script,

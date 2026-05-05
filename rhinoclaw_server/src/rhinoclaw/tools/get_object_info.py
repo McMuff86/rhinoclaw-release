@@ -1,4 +1,3 @@
-import json
 from typing import Any, Dict
 
 from mcp.server.fastmcp import Context

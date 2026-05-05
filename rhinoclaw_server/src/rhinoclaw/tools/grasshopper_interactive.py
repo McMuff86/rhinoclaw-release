@@ -12,7 +12,7 @@ fully automated Grasshopper workflows possible.
 import asyncio
 import json
 import re
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 
 from mcp.server.fastmcp import Context
 
@@ -223,15 +223,6 @@ async def run_door_script(
         - The door script expects: height, width, plane selection, origin
         - Uses the interactive WebSocket approach for automation
     """
-    # Build the inputs dict for the door script
-    inputs = {
-        "lichthoehe": str(height),
-        "lichtbreite": str(width),
-        "getplane.*worldxy.*worldyz": plane,
-        "getplane.*parallelgrid": origin,
-        "getplane.*undo": "_Enter",  # Rhino command to confirm plane
-    }
-    
     try:
         # Use the general interactive runner
         ws_client = get_websocket_client()

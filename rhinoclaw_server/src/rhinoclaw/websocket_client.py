@@ -36,7 +36,6 @@ import json
 import logging
 import re
 import threading
-import time
 import uuid
 from collections import deque
 from dataclasses import dataclass
@@ -383,7 +382,7 @@ class RhinoWebSocketClient:
                     response = self._pending_responses.get(request_id, {})
                 return response.get("success", False)
             except asyncio.TimeoutError:
-                logger.warning(f"Timeout waiting for input response")
+                logger.warning("Timeout waiting for input response")
                 return False
                 
         except Exception as e:
@@ -440,7 +439,7 @@ class RhinoWebSocketClient:
                 await asyncio.wait_for(completion_event.wait(), timeout=timeout)
                 return result["success"]
             except asyncio.TimeoutError:
-                logger.warning(f"Timeout waiting for script completion")
+                logger.warning("Timeout waiting for script completion")
                 return False
             finally:
                 self.remove_callback(on_event)
