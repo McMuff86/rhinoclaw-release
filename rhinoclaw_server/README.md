@@ -53,7 +53,7 @@ rhinoclaw_server/
 
 ## Available Tools
 
-For the complete and up-to-date tool list, see [USAGE.md](../USAGE.md).
+For the complete and up-to-date tool list, see [USAGE.md](../docs/USAGE.md).
 
 **Categories:**
 - **System**: ping, get_document_info, get_logs, set_debug_mode
@@ -84,4 +84,4 @@ uv publish
 
 - [Main README](../README.md) - Installation and usage
 - [AGENTS.md](../AGENTS.md) - Agent-focused guide
-- [USAGE.md](../USAGE.md) - Tool reference and usage examples
+- [USAGE.md](../docs/USAGE.md) - Tool reference and usage examples

@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -75,11 +76,16 @@ def capture_viewport(
             safe_viewport_name = viewport_name.replace(" ", "_").replace("/", "_")
             final_filename = str(screenshots_dir / f"viewport_{safe_viewport_name}_{timestamp}.png")
         elif filename is not None:
-            # Check if filename is absolute path
+            # Absolute? Mind the cross-OS gap: on a POSIX server (WSL),
+            # Path("C:/...").is_absolute() is False — but the path is
+            # absolute for the WINDOWS Rhino that writes the file. Treat
+            # drive-letter and UNC paths as absolute too.
             file_path = Path(filename)
-            if file_path.is_absolute():
+            is_windows_abs = bool(re.match(r"^[A-Za-z]:[/\\]", filename)) \
+                or filename.startswith("\\\\")
+            if file_path.is_absolute() or is_windows_abs:
                 # Use absolute path as-is
-                final_filename = str(file_path)
+                final_filename = filename
             else:
                 # Relative path - save to screenshots directory
                 screenshots_dir = get_screenshots_dir()

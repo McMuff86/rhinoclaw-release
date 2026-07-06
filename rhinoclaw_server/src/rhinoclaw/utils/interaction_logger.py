@@ -42,7 +42,14 @@ class InteractionRecord:
     response_summary: Optional[Dict[str, Any]] = None
     duration_ms: Optional[float] = None
     client_model: Optional[str] = None
-    
+    # Judge-measured outcome (place → judge → log). This is the corpus the
+    # self-improving loop distills from — judge-derived, never agent-claimed.
+    placement_outcome: Optional[Dict[str, Any]] = None
+    # Critic-measured graph-authoring outcome (author → lint → bake → measure
+    # → log, NEXT-LEVEL 5.3). Separate field so the door-recipe distiller
+    # never sees graph records; the future graph distiller (G4) keys on this.
+    graph_outcome: Optional[Dict[str, Any]] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
         return {k: v for k, v in asdict(self).items() if v is not None}
@@ -153,6 +160,63 @@ class InteractionLogger:
         
         self._write_record(record)
     
+    def log_outcome(
+        self,
+        outcome: Dict[str, Any],
+        tool_name: str = "judge_door_placement",
+    ) -> None:
+        """Log a judge-measured placement outcome (NEXT-LEVEL-PLAN 2.2).
+
+        `outcome` is the verdict for ONE door, e.g.
+        ``{"door_id": "RT01", "pass": true, "off_center_mm": 3.5,
+        "axis_deg_error": 0.0, "width_error_mm": 0.0, "rotation_applied": 0,
+        "wall_axis": "x", "width_requested": 900}``.
+        The distiller (3.1) reads these records keyed by
+        ``(door_type, wall_axis)`` to recall the best passing parameters.
+        """
+        if not self._enabled:
+            return
+
+        record = InteractionRecord(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            session_id=self._session_id,
+            tool_name=tool_name,
+            tool_args={},
+            success=bool(outcome.get("pass")),
+            placement_outcome=outcome,
+            client_model=self._client_model,
+        )
+        self._write_record(record)
+
+    def log_graph_outcome(
+        self,
+        outcome: Dict[str, Any],
+        tool_name: str = "build_gh_interactive",
+    ) -> None:
+        """Log a critic-measured graph-authoring outcome (NEXT-LEVEL 5.3).
+
+        `outcome` is the verdict for ONE loop iteration, e.g.
+        ``{"label": "param_box", "iteration": 2, "pass": true,
+        "stage_reached": "measure", "baked_count": 1,
+        "bake_output_used": "B", "headless_solvable": true,
+        "definition": "C:/.../box.gh"}``. Same Goodhart rule as
+        placement outcomes: only critic-measured values, never the
+        agent's claims.
+        """
+        if not self._enabled:
+            return
+
+        record = InteractionRecord(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            session_id=self._session_id,
+            tool_name=tool_name,
+            tool_args={},
+            success=bool(outcome.get("pass")),
+            graph_outcome=outcome,
+            client_model=self._client_model,
+        )
+        self._write_record(record)
+
     def _sanitize_args(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
         Sanitize arguments for logging.

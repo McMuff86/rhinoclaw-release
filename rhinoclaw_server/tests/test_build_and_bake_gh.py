@@ -1,0 +1,142 @@
+"""Tests for the build_and_bake_gh tool — the one-shot author→solve→bake path."""
+import json
+from unittest.mock import MagicMock, patch
+
+SLIDER = {"type": "slider", "name": "Radius", "default": 5}
+SCRIPT = {"type": "python3_script", "name": "Sph", "code": "a = Radius", "inputs": ["Radius"]}
+WIRE = {"from": "Radius", "to": "Sph", "to_input": "Radius"}
+
+
+class TestBuildAndBakeGh:
+    def test_success_returns_baked_ids(self):
+        from rhinoclaw.tools.build_and_bake_gh import build_and_bake_gh
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {
+            "file_path": "C:/test/sph.gh",
+            "layer": "Spheres",
+            "baked_count": 2,
+            "baked_ids": ["guid-1", "guid-2"],
+            "status": "success",
+        }
+        with patch(
+            "rhinoclaw.tools.build_and_bake_gh.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            result = build_and_bake_gh(
+                MagicMock(), "C:/test/sph.gh", [SLIDER, SCRIPT], [WIRE], layer="Spheres"
+            )
+
+        data = json.loads(result)
+        assert data["success"] is True
+        assert data["data"]["baked_count"] == 2
+        assert data["data"]["baked_ids"] == ["guid-1", "guid-2"]
+        cmd, params = mock_rhino.send_command.call_args[0]
+        assert cmd == "build_and_bake_gh"
+        assert params["layer"] == "Spheres"
+        assert params["wires"] == [WIRE]
+
+    def test_no_geometry_status_passes_through(self):
+        from rhinoclaw.tools.build_and_bake_gh import build_and_bake_gh
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {
+            "file_path": "C:/test/sph.gh",
+            "layer": "GH_Bake",
+            "baked_count": 0,
+            "baked_ids": [],
+            "status": "no_geometry",
+        }
+        with patch(
+            "rhinoclaw.tools.build_and_bake_gh.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            result = build_and_bake_gh(MagicMock(), "C:/test/sph.gh", [SCRIPT])
+
+        data = json.loads(result)
+        # Transport success, but the agent can see nothing actually baked.
+        assert data["success"] is True
+        assert data["data"]["status"] == "no_geometry"
+        assert data["data"]["baked_count"] == 0
+        assert "no_geometry" in data["message"]
+
+    def test_material_forwarded_when_given(self):
+        from rhinoclaw.tools.build_and_bake_gh import build_and_bake_gh
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {"status": "success", "baked_count": 1}
+        with patch(
+            "rhinoclaw.tools.build_and_bake_gh.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            build_and_bake_gh(
+                MagicMock(), "C:/test/sph.gh", [SLIDER], material="Glass"
+            )
+
+        _, params = mock_rhino.send_command.call_args[0]
+        assert params["material"] == "Glass"
+        assert params["layer"] == "GH_Bake"  # default
+
+    def test_bake_output_defaults_to_a(self):
+        from rhinoclaw.tools.build_and_bake_gh import build_and_bake_gh
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {"status": "success", "baked_count": 1}
+        with patch(
+            "rhinoclaw.tools.build_and_bake_gh.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            build_and_bake_gh(MagicMock(), "C:/test/sph.gh", [SLIDER])
+
+        _, params = mock_rhino.send_command.call_args[0]
+        assert params["bake_output"] == "a"
+
+    def test_bake_output_forwarded(self):
+        from rhinoclaw.tools.build_and_bake_gh import build_and_bake_gh
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {"status": "success", "baked_count": 1}
+        with patch(
+            "rhinoclaw.tools.build_and_bake_gh.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            # native Center Box bakes its "B" output, not "a"
+            build_and_bake_gh(MagicMock(), "C:/test/box.gh", [SLIDER], bake_output="B")
+
+        _, params = mock_rhino.send_command.call_args[0]
+        assert params["bake_output"] == "B"
+
+    def test_material_omitted_when_none(self):
+        from rhinoclaw.tools.build_and_bake_gh import build_and_bake_gh
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {"status": "success", "baked_count": 1}
+        with patch(
+            "rhinoclaw.tools.build_and_bake_gh.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            build_and_bake_gh(MagicMock(), "C:/test/sph.gh", [SLIDER])
+
+        _, params = mock_rhino.send_command.call_args[0]
+        assert "material" not in params
+
+    def test_empty_path_fails(self):
+        from rhinoclaw.tools.build_and_bake_gh import build_and_bake_gh
+
+        data = json.loads(build_and_bake_gh(MagicMock(), "", [SLIDER]))
+        assert data["success"] is False
+        assert "file_path is required" in data["message"]
+
+    def test_wrong_extension_fails(self):
+        from rhinoclaw.tools.build_and_bake_gh import build_and_bake_gh
+
+        data = json.loads(build_and_bake_gh(MagicMock(), "C:/test/sph.3dm", [SLIDER]))
+        assert data["success"] is False
+        assert ".gh" in data["message"]
+
+    def test_empty_components_fails(self):
+        from rhinoclaw.tools.build_and_bake_gh import build_and_bake_gh
+
+        data = json.loads(build_and_bake_gh(MagicMock(), "C:/test/sph.gh", []))
+        assert data["success"] is False
+        assert "components" in data["message"]

@@ -5,8 +5,8 @@
 # RhinoClaw - AI-Powered Rhino 3D Automation via MCP
 
 [![CI](https://github.com/McMuff86/rhinoclaw/actions/workflows/ci.yml/badge.svg)](https://github.com/McMuff86/rhinoclaw/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-386%20passed-brightgreen)
-![Version](https://img.shields.io/badge/version-0.2.9-blue)
+![Tests](https://img.shields.io/badge/tests-588%20passed-brightgreen)
+![Version](https://img.shields.io/badge/version-0.7.0-blue)
 [![ClawHub](https://img.shields.io/badge/ClawHub-rhinoclaw-orange)](https://clawhub.ai/McMuff86/rhinoclaw)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)

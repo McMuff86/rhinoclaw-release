@@ -1,0 +1,20 @@
+{
+  "name": "door_bench_12",
+  "description": "Fixed 12-opening benchmark scene (NEXT-LEVEL-PLAN 3.3). Answer key IS the opening axis: segment length = Lichtbreite, direction = wall axis. Coordinates sit at y>=8000 so they never collide with demo doors near the origin.",
+  "definition": "Rahmentuer_UD5.gh",
+  "width_allowance_mm": 220.0,
+  "openings": [
+    {"id": "B01", "start": [110, 8000, 0], "end": [1010, 8000, 0], "wall_axis": "x", "lichtbreite": 900},
+    {"id": "B02", "start": [2110, 8000, 0], "end": [2910, 8000, 0], "wall_axis": "x", "lichtbreite": 800},
+    {"id": "B03", "start": [4110, 8000, 0], "end": [4810, 8000, 0], "wall_axis": "x", "lichtbreite": 700},
+    {"id": "B04", "start": [6110, 8000, 0], "end": [7110, 8000, 0], "wall_axis": "x", "lichtbreite": 1000},
+    {"id": "B05", "start": [8110, 8000, 0], "end": [9010, 8000, 0], "wall_axis": "x", "lichtbreite": 900},
+    {"id": "B06", "start": [10110, 8000, 0], "end": [10910, 8000, 0], "wall_axis": "x", "lichtbreite": 800},
+    {"id": "B07", "start": [0, 10110, 0], "end": [0, 11010, 0], "wall_axis": "y", "lichtbreite": 900},
+    {"id": "B08", "start": [2000, 10110, 0], "end": [2000, 10910, 0], "wall_axis": "y", "lichtbreite": 800},
+    {"id": "B09", "start": [4000, 10110, 0], "end": [4000, 10810, 0], "wall_axis": "y", "lichtbreite": 700},
+    {"id": "B10", "start": [6000, 10110, 0], "end": [6000, 11110, 0], "wall_axis": "y", "lichtbreite": 1000},
+    {"id": "B11", "start": [8000, 10110, 0], "end": [8000, 11010, 0], "wall_axis": "y", "lichtbreite": 900},
+    {"id": "B12", "start": [10000, 10110, 0], "end": [10000, 10910, 0], "wall_axis": "y", "lichtbreite": 800}
+  ]
+}

@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v7.0": {
-      "rhinoclaw/0.2.5": {
+      "rhinoclaw/0.7.0": {
         "dependencies": {
           "Fleck": "1.2.0",
           "Newtonsoft.Json": "13.0.3",
@@ -62,7 +62,7 @@
     }
   },
   "libraries": {
-    "rhinoclaw/0.2.5": {
+    "rhinoclaw/0.7.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

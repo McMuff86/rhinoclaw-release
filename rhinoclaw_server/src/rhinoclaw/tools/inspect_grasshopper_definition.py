@@ -57,7 +57,17 @@ def inspect_grasshopper_definition(
           `is_prompt_default_source: true` and `feeds_prompt_guid`
           pointing at the prompt they belong to.
         - `outputs`: list of unconnected output ports
-          (`name`, `nickname`, `type`, `component_name`).
+          (`name`, `nickname`, `type`, `component_name`, `is_script`).
+        - `groups`: list of `{nickname, member_count, member_nicknames}` —
+          relevant for the Compute Platform `RH_OUT:<Name>` group contract.
+        - `script_component_count` + `headless_solvable`: script components
+          (Python3/GhPython/C#) don't solve in headless GH on Rhino 8, so
+          `headless_solvable` is true only for native-only definitions —
+          check this BEFORE a `build_and_bake_gh` / `bake_grasshopper`
+          round-trip.
+        - `script_components`: per script component `{name, nickname, guid,
+          type, outputs}` — script output names must stay valid script
+          variable names (never `RH_OUT:*`).
         - `components_by_type` (only if `include_components=True`):
           list of `{type, count}`, sorted descending.
 

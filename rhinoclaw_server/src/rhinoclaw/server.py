@@ -2,16 +2,17 @@
 import json
 import logging
 import socket
+import threading
 import time
-import uuid
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, Optional
 
 from mcp.server.fastmcp import FastMCP
 
 from rhinoclaw.config import get_settings
 from rhinoclaw.logging_setup import configure_logging
+from rhinoclaw.transport import wire
 
 # Configure logging according to settings (text or JSON format).
 _settings = get_settings()
@@ -34,6 +35,11 @@ class RhinoConnection:
     sock: socket.socket | None = None
     max_retries: int = 3
     retry_delay: float = 1.0
+    # Serialises send→receive pairs on the shared socket. Without it, two
+    # concurrent send_command calls interleave their writes/reads and each
+    # may consume the other's response (silent corruption). (W5d)
+    _io_lock: threading.Lock = field(default_factory=threading.Lock,
+                                     repr=False, compare=False)
     
     def connect(self) -> bool:
         """Connect to the Rhino addon socket server"""
@@ -109,76 +115,56 @@ class RhinoConnection:
             finally:
                 self.sock = None
 
-    def receive_full_response(self, sock, buffer_size=8192):
-        """Receive the complete response, potentially in multiple chunks"""
-        chunks = []
-        # Match the per-call timeout configured for this connection.
-        sock.settimeout(get_settings().timeout_seconds)
-        
+    def receive_full_response(self, sock, buffer_size=8192, timeout=None):
+        """Receive the complete response, potentially in multiple chunks.
+
+        The chunk-until-it-parses framing lives in ``wire.read_json_frame``
+        (shared with the rhinoclaw_client CLI, A3); this wrapper adds the
+        connection's per-call timeout, logging, and the operator-facing "no
+        reply" hint. A silent no-reply surfaces as a plain ``Exception`` (NOT a
+        ``socket.timeout``/``ConnectionError``), so ``send_command`` does not
+        blindly re-send a command that may already have run. A genuine drop
+        (RST) still propagates as a ``ConnectionError`` for the retry path.
+        """
+        # Honour the caller's per-call timeout (send_command clamps it to
+        # [1.0, max_timeout_seconds]); fall back to the configured default.
+        # Long-running commands would otherwise be cut off at the default.
+        sock.settimeout(timeout if timeout is not None else get_settings().timeout_seconds)
         try:
-            while True:
-                try:
-                    chunk = sock.recv(buffer_size)
-                    if not chunk:
-                        # If we get an empty chunk, the connection might be closed
-                        if not chunks:  # If we haven't received anything yet, this is an error
-                            raise Exception("Connection closed before receiving any data")
-                        break
-                    
-                    chunks.append(chunk)
-                    
-                    # Check if we've received a complete JSON object
-                    try:
-                        data = b''.join(chunks)
-                        json.loads(data.decode('utf-8'))
-                        # If we get here, it parsed successfully
-                        logger.info(f"Received complete response ({len(data)} bytes)")
-                        return data
-                    except json.JSONDecodeError:
-                        # Incomplete JSON, continue receiving
-                        continue
-                except socket.timeout:
-                    # If we hit a timeout during receiving, break the loop and try to use what we have
-                    logger.warning("Socket timeout during chunked receive")
-                    break
-                except (ConnectionError, BrokenPipeError, ConnectionResetError) as e:
-                    logger.error(f"Socket connection error during receive: {str(e)}")
-                    raise  # Re-raise to be handled by the caller
-        except socket.timeout:
-            logger.warning("Socket timeout during chunked receive")
-        except Exception as e:
-            logger.error(f"Error during receive: {str(e)}")
-            raise
-            
-        # If we get here, we either timed out or broke out of the loop
-        # Try to use what we have
-        if chunks:
-            data = b''.join(chunks)
-            logger.info(f"Returning data after receive completion ({len(data)} bytes)")
-            try:
-                # Try to parse what we have
-                json.loads(data.decode('utf-8'))
-                return data
-            except json.JSONDecodeError:
-                # If we can't parse it, it's incomplete
-                raise Exception("Incomplete JSON response received")
-        else:
-            raise Exception("No data received")
+            data = wire.read_json_frame(sock, buffer_size=buffer_size)
+        except wire.IncompleteFrameError as e:
+            # Empty/truncated stream within the timeout — most often a blocked
+            # Rhino UI thread. Keep that operator hint (and stay a plain
+            # Exception so the auto-retry does not fire).
+            logger.warning(f"Incomplete receive: {e}")
+            raise Exception(
+                "No data received — Rhino did not answer in time. Likely a "
+                "MODAL DIALOG or long-running command is blocking the UI "
+                "thread (invisible to remote agents): run get_ui_state, and "
+                "check the Rhino screen.") from e
+        logger.info(f"Received complete response ({len(data)} bytes)")
+        return data
 
-    def _execute_command(self, command_type: str, params: Dict[str, Any], timeout: float = 15.0) -> Dict[str, Any]:
-        """Internal method to execute a command (no retry logic)"""
-        request_id = uuid.uuid4().hex[:8]
-        command: Dict[str, Any] = {
-            "type": command_type,
-            "params": params or {},
-            "request_id": request_id,
-        }
+    def _execute_command(self, command_type: str, params: Dict[str, Any], timeout: float = 15.0,
+                         idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        """Internal method to execute a command (no retry logic).
 
-        # Inject auth token if the env-var is set; the plugin enforces it
-        # only when it has a token of its own configured.
+        `idempotency_key` is stable across the reconnect-retry in
+        `send_command`, so the plugin can de-duplicate a command that already
+        ran server-side before the socket dropped (instead of re-executing it).
+        """
+        request_id = wire.new_request_id()
+        # Auth token is injected only when configured; the plugin enforces it
+        # only when it has a token of its own. Frame assembly lives in `wire`
+        # (shared with the rhinoclaw_client CLI, A3).
         settings = get_settings()
-        if settings.auth_token:
-            command["auth"] = settings.auth_token
+        command = wire.build_command(
+            command_type,
+            params,
+            request_id=request_id,
+            idempotency_key=idempotency_key,
+            auth_token=settings.auth_token,
+        )
 
         log_extra = {"request_id": request_id, "tool": command_type}
         if _debug_mode:
@@ -195,13 +181,14 @@ class RhinoConnection:
         if self.sock is None:
             raise ConnectionError("Socket is not connected")
 
-        command_json = json.dumps(command)
-        self.sock.sendall(command_json.encode('utf-8'))
-        if _debug_mode:
-            logger.debug(f"Command JSON sent: {command_json}")
+        # One send→receive pair at a time on the shared socket (W5d).
+        with self._io_lock:
+            command_bytes = wire.encode_command(command)
+            self.sock.sendall(command_bytes)
+            if _debug_mode:
+                logger.debug(f"Command JSON sent: {command_bytes.decode('utf-8')}")
 
-        self.sock.settimeout(timeout)
-        response_data = self.receive_full_response(self.sock)
+            response_data = self.receive_full_response(self.sock, timeout=timeout)
         if _debug_mode:
             logger.debug(f"Received raw response: {response_data.decode('utf-8')}")
 
@@ -210,6 +197,19 @@ class RhinoConnection:
             logger.debug(f"Response parsed: {json.dumps(response, indent=2)}")
         else:
             logger.info(f"Response parsed, status: {response.get('status', 'unknown')}")
+
+        # Transport integrity (W5d): the plugin echoes our request_id; a
+        # mismatch means we just consumed a response that belongs to a
+        # DIFFERENT call (stale frame after a timeout, interleaved client).
+        # Fail loudly and discard the socket — the stream is poisoned.
+        if wire.is_request_id_mismatch(request_id, response):
+            echoed = response.get("request_id")
+            self.disconnect()
+            raise Exception(
+                f"Transport integrity error: response request_id '{echoed}' "
+                f"does not match sent '{request_id}' (command "
+                f"{command_type}). A stale or interleaved frame was on the "
+                "socket; the connection has been dropped — retry the call.")
 
         if response.get("status") == "error":
             logger.error(f"Rhino error: {response.get('message')}")
@@ -234,6 +234,11 @@ class RhinoConnection:
         if timeout is None:
             timeout = settings.timeout_seconds
         timeout = min(max(timeout, 1.0), settings.max_timeout_seconds)
+        # One idempotency key per logical call, REUSED across the reconnect
+        # retry below — lets the plugin de-duplicate a command that already ran
+        # server-side before the socket dropped, instead of executing it twice
+        # (e.g. baking doors twice). See tests/test_transport_loopback.py.
+        idempotency_key = wire.new_idempotency_key()
         start_time = time.time()
         
         if not self.sock and not self.connect():
@@ -249,8 +254,9 @@ class RhinoConnection:
             raise ConnectionError("Not connected to Rhino")
         
         try:
-            result = self._execute_command(command_type, params, timeout=timeout)
-            
+            result = self._execute_command(command_type, params, timeout=timeout,
+                                            idempotency_key=idempotency_key)
+
             # Log successful call
             interaction_logger.log_tool_call(
                 tool_name=command_type,
@@ -268,8 +274,11 @@ class RhinoConnection:
             if self.reconnect():
                 logger.info("Reconnected successfully, retrying command...")
                 try:
-                    result = self._execute_command(command_type, params, timeout=timeout)
-                    
+                    # Same idempotency_key as the first attempt → the plugin
+                    # can recognise this retry as a duplicate and not re-run it.
+                    result = self._execute_command(command_type, params, timeout=timeout,
+                                                   idempotency_key=idempotency_key)
+
                     # Log successful retry
                     interaction_logger.log_tool_call(
                         tool_name=command_type,
