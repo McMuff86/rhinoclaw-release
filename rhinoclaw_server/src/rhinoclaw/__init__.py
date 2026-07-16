@@ -1,6 +1,6 @@
 """Rhino integration through the Model Context Protocol."""
 
-__version__ = "0.7.0"
+__version__ = "0.7.2"
 
 # Expose key classes and functions for easier imports
 from .prompts.assert_general_strategy import asset_general_strategy
