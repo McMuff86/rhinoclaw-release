@@ -4,7 +4,7 @@
 
 # RhinoClaw - AI-Powered Rhino 3D Automation via MCP
 
-![Tests](https://img.shields.io/badge/tests-588%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-583%20passed-brightgreen)
 ![Version](https://img.shields.io/badge/version-0.7.2-blue)
 [![ClawHub](https://img.shields.io/badge/ClawHub-rhinoclaw-orange)](https://clawhub.ai/McMuff86/rhinoclaw)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
@@ -234,15 +234,13 @@ on both the Rhino host and the AI client):
 ## Development
 
 ```bash
-# Install dev dependencies
 cd rhinoclaw_server
-uv pip install -e ".[dev]"
 
-# Run tests
-uv run pytest tests/ -v
+# Run tests (583 pass Rhino-free; 5 skip without a live Rhino)
+uv run --extra dev pytest tests/ -v
 
-# Build
-cd rhinoclaw_server && uv build        # Python package
+# Build the Python package
+uv build
 ```
 
 ## Contributing
