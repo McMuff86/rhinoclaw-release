@@ -9,7 +9,7 @@ from rhinoclaw.utils.responses import error, from_exception, ok
 
 @mcp.tool()
 def erp_list_tools(ctx: Context) -> str:
-    """List the ERP tools exposed by the RhinoERPBridge plugin (Borm-ERP/BOM integration:
+    """List the ERP tools exposed by the RhinoERPBridge plugin (generic ERP/BOM integration:
     article search in the ERP master data, BOM collection from the Rhino document,
     BOM validation/doctor). Returns an MCP-style manifest — for each tool: name,
     description and inputSchema (JSON Schema of its arguments).
