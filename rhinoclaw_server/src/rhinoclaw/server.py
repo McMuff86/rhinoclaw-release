@@ -13,6 +13,7 @@ from mcp.server.fastmcp import FastMCP
 from rhinoclaw.config import get_settings
 from rhinoclaw.logging_setup import configure_logging
 from rhinoclaw.transport import wire
+from rhinoclaw.utils.errors import ErrorCode, RhinoCommandError
 
 # Configure logging according to settings (text or JSON format).
 _settings = get_settings()
@@ -213,7 +214,11 @@ class RhinoConnection:
 
         if response.get("status") == "error":
             logger.error(f"Rhino error: {response.get('message')}")
-            raise Exception(response.get("message", "Unknown error from Rhino"))
+            raise RhinoCommandError(
+                response.get("message", "Unknown error from Rhino"),
+                error_code=response.get("error_code", ErrorCode.RHINO_ERROR),
+                response=response,
+            )
 
         return response.get("result", {})
 
@@ -289,6 +294,20 @@ class RhinoConnection:
                     )
                     
                     return result
+                except RhinoCommandError as retry_error:
+                    logger.error(
+                        "Rhino rejected command after reconnect: %s",
+                        retry_error,
+                    )
+                    interaction_logger.log_tool_call(
+                        tool_name=command_type,
+                        tool_args=params or {},
+                        success=False,
+                        error_code=retry_error.error_code,
+                        error_message=str(retry_error),
+                        duration_ms=(time.time() - start_time) * 1000,
+                    )
+                    raise
                 except Exception as retry_error:
                     logger.error(f"Command failed after reconnect: {str(retry_error)}")
                     self.sock = None
@@ -315,6 +334,21 @@ class RhinoConnection:
                     duration_ms=(time.time() - start_time) * 1000,
                 )
                 raise ConnectionError("Failed to reconnect to Rhino. Make sure the Rhino plugin is running.")
+        except RhinoCommandError as e:
+            logger.error(f"Rhino rejected command: {str(e)}")
+
+            interaction_logger.log_tool_call(
+                tool_name=command_type,
+                tool_args=params or {},
+                success=False,
+                error_code=e.error_code,
+                error_message=str(e),
+                duration_ms=(time.time() - start_time) * 1000,
+            )
+
+            # A domain/validation error is a valid response frame. Keep the
+            # healthy socket and preserve the plugin's machine-readable code.
+            raise
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON response from Rhino: {str(e)}")
             

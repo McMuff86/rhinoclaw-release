@@ -7,6 +7,7 @@ import socket
 import json
 
 from rhinoclaw.server import RhinoConnection
+from rhinoclaw.utils.errors import RhinoCommandError
 
 
 class TestRhinoConnectionInit:
@@ -153,3 +154,52 @@ class TestReconnect:
         
         assert result is True
         mock_sleep.assert_called_once_with(2.0)
+
+
+class TestStructuredPluginErrors:
+    """Plugin error frames must survive the Python transport boundary."""
+
+    def test_execute_command_preserves_plugin_code_and_response(self):
+        conn = RhinoConnection(host="127.0.0.1", port=1999)
+        conn.sock = MagicMock(spec=socket.socket)
+        response = {
+            "status": "error",
+            "error_code": "AMBIGUOUS_REFERENCE",
+            "message": "Viewport 'Top' is ambiguous",
+        }
+
+        with (
+            patch.object(
+                conn,
+                "receive_full_response",
+                return_value=json.dumps(response).encode("utf-8"),
+            ),
+            pytest.raises(RhinoCommandError) as exc_info,
+        ):
+            conn._execute_command("capture_viewport", {})
+
+        assert exc_info.value.error_code == "AMBIGUOUS_REFERENCE"
+        assert exc_info.value.response == response
+
+    def test_send_command_keeps_socket_and_does_not_reclassify_plugin_error(self):
+        conn = RhinoConnection(host="127.0.0.1", port=1999)
+        connected_socket = MagicMock(spec=socket.socket)
+        conn.sock = connected_socket
+        plugin_error = RhinoCommandError(
+            "width must be a JSON integer",
+            error_code="INVALID_PARAMS",
+        )
+
+        with (
+            patch.object(conn, "_execute_command", side_effect=plugin_error),
+            patch(
+                "rhinoclaw.utils.interaction_logger.interaction_logger.log_tool_call"
+            ) as log_tool_call,
+            pytest.raises(RhinoCommandError) as exc_info,
+        ):
+            conn.send_command("capture_viewport", {"width": True})
+
+        assert exc_info.value is plugin_error
+        assert exc_info.value.error_code == "INVALID_PARAMS"
+        assert conn.sock is connected_socket
+        assert log_tool_call.call_args.kwargs["error_code"] == "INVALID_PARAMS"

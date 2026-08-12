@@ -6,6 +6,11 @@ from mcp.server.fastmcp import Context
 from rhinoclaw.server import get_rhino_connection, logger, mcp
 from rhinoclaw.utils.errors import ErrorCode
 from rhinoclaw.utils.responses import from_exception, ok
+from rhinoclaw.utils.viewports import (
+    require_verified_viewport_mutation,
+    resolved_viewport_label,
+    viewport_params,
+)
 
 
 def _is_point(value: Optional[List[float]]) -> bool:
@@ -18,7 +23,7 @@ def set_camera(
     camera_location: List[float],
     target_location: Optional[List[float]] = None,
     lens_length: Optional[float] = None,
-    viewport_name: str = "Perspective"
+    viewport_name: Optional[str] = None,
 ) -> str:
     """
     Set the camera position for a viewport.
@@ -27,7 +32,8 @@ def set_camera(
     - camera_location: Camera location [x, y, z]
     - target_location: Optional target location [x, y, z]
     - lens_length: Optional 35mm lens length
-    - viewport_name: Name of the viewport to modify
+    - viewport_name: Optional localized name, GUID, or `Layout::Detail`.
+      Omit it to modify Rhino's active viewport.
 
     Returns:
     Success message with camera settings
@@ -52,10 +58,7 @@ def set_camera(
 
     try:
         rhino = get_rhino_connection()
-        params = {
-            "viewport_name": viewport_name,
-            "camera_location": camera_location
-        }
+        params = viewport_params({"camera_location": camera_location}, viewport_name)
 
         if target_location is not None:
             params["target_location"] = target_location
@@ -64,9 +67,11 @@ def set_camera(
             params["lens_length"] = lens_length
 
         result = rhino.send_command("set_camera", params)
+        require_verified_viewport_mutation(result)
+        resolved = resolved_viewport_label(result, viewport_name)
 
         return json.dumps(ok(
-            message=f"Camera updated for viewport '{viewport_name}'",
+            message=f"Camera updated for viewport '{resolved}'",
             data=result
         ))
     except Exception as e:

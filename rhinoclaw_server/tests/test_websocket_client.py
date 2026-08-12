@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from rhinoclaw.config import reload_settings
 from rhinoclaw.websocket_client import (
     RhinoWebSocketClient,
     WebSocketEvent,
@@ -263,6 +264,61 @@ class TestSingletonClient:
         
         assert client is not None
         assert isinstance(client, RhinoWebSocketClient)
+
+    def test_get_websocket_client_uses_shared_transport_settings(
+        self,
+        monkeypatch,
+    ):
+        """WS follows the configured WSL/remote host instead of localhost."""
+        try:
+            with monkeypatch.context() as scoped:
+                scoped.setenv("RHINOCLAW_HOST", "127.0.0.1")
+                scoped.setenv("RHINOCLAW_WS_PORT", "2456")
+                reload_settings()
+                reset_websocket_client()
+
+                client = get_websocket_client()
+
+                assert client.host == "127.0.0.1"
+                assert client.port == 2456
+                assert client.url == "ws://127.0.0.1:2456"
+        finally:
+            reload_settings()
+            reset_websocket_client()
+
+    def test_inactive_singleton_is_rebuilt_for_an_explicit_endpoint(self):
+        first = get_websocket_client(host="127.0.0.1", port=2000)
+
+        second = get_websocket_client(host="192.0.2.10", port=2200)
+
+        assert second is not first
+        assert second.url == "ws://192.0.2.10:2200"
+
+    def test_default_singleton_stays_recoverable_after_settings_reload(
+        self,
+        monkeypatch,
+    ):
+        first = get_websocket_client()
+        first._running = True
+        try:
+            with monkeypatch.context() as scoped:
+                scoped.setenv("RHINOCLAW_HOST", "192.0.2.20")
+                scoped.setenv("RHINOCLAW_WS_PORT", "2201")
+                reload_settings()
+
+                assert get_websocket_client() is first
+        finally:
+            first._running = False
+            reload_settings()
+
+    def test_active_singleton_rejects_explicit_endpoint_change(self):
+        client = get_websocket_client(host="127.0.0.1", port=2000)
+        client._running = True
+        try:
+            with pytest.raises(RuntimeError, match="endpoint changed"):
+                get_websocket_client(host="192.0.2.30", port=2202)
+        finally:
+            client._running = False
 
     def test_get_websocket_client_returns_same(self):
         """Test get_websocket_client returns same instance."""

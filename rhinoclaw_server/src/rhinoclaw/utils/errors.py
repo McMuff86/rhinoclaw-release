@@ -18,6 +18,13 @@ class ErrorCode:
     MISSING_PARAMS = "MISSING_PARAMS"
     INVALID_TYPE = "INVALID_TYPE"
     INVALID_ID = "INVALID_ID"
+    UNSUPPORTED_OPERATION = "UNSUPPORTED_OPERATION"
+    AMBIGUOUS_REFERENCE = "AMBIGUOUS_REFERENCE"
+    ALREADY_EXISTS = "ALREADY_EXISTS"
+    RESOURCE_IN_USE = "RESOURCE_IN_USE"
+    PRECONDITION_FAILED = "PRECONDITION_FAILED"
+    VERIFICATION_FAILED = "VERIFICATION_FAILED"
+    PARTIAL_MUTATION = "PARTIAL_MUTATION"
 
     # Rhino errors (3xx range conceptually)
     RHINO_ERROR = "RHINO_ERROR"
@@ -51,6 +58,20 @@ class ErrorCode:
     # Generic errors
     UNKNOWN_ERROR = "UNKNOWN_ERROR"
     INTERNAL_ERROR = "INTERNAL_ERROR"
+
+
+class RhinoCommandError(Exception):
+    """A structured error response returned by the Rhino plugin."""
+
+    def __init__(
+        self,
+        message: str,
+        error_code: str = ErrorCode.RHINO_ERROR,
+        response: dict | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.error_code = error_code or ErrorCode.RHINO_ERROR
+        self.response = dict(response or {})
 
 
 def get_connection_error_code(exception: Exception) -> str:

@@ -83,6 +83,20 @@ def _default_log_dir() -> Path:
     return Path(__file__).resolve().parent.parent.parent / "logs"
 
 
+def _library_dir() -> Optional[Path]:
+    """Root of the file-based part library (``RHINOCLAW_LIBRARY_DIR``).
+
+    Expected layout: ``<dir>/catalog.json`` plus ``<dir>/parts/<part_id>/``
+    folders each containing ``part.3dm`` + ``part.json``. ``None`` when the
+    variable is unset — the library tools then answer with a setup hint
+    instead of guessing a path.
+    """
+    raw = os.environ.get("RHINOCLAW_LIBRARY_DIR")
+    if not raw:
+        return None
+    return Path(raw).expanduser()
+
+
 @dataclass(frozen=True)
 class Settings:
     """Runtime configuration. Access via :func:`get_settings`."""
@@ -96,6 +110,7 @@ class Settings:
     auth_token: Optional[str]
     log_format: str  # "text" or "json"
     log_dir: Path
+    library_dir: Optional[Path]
 
     @property
     def auth_required(self) -> bool:
@@ -113,6 +128,7 @@ class Settings:
             auth_token=os.environ.get("RHINOCLAW_AUTH_TOKEN") or None,
             log_format=_env_str("RHINOCLAW_LOG_FORMAT", "text").lower(),
             log_dir=_default_log_dir(),
+            library_dir=_library_dir(),
         )
 
 

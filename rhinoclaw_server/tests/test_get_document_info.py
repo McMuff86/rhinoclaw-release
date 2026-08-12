@@ -2,6 +2,7 @@
 Tests for the get_document_info tool.
 """
 import json
+from pathlib import Path
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -85,3 +86,34 @@ class TestGetDocumentInfoErrors:
         parsed = json.loads(result)
         
         assert parsed["success"] is False
+
+
+def test_plugin_count_matches_the_serialized_non_phantom_scope():
+    source = (
+        Path(__file__).resolve().parents[2]
+        / "rhinoclaw_plugin"
+        / "Functions"
+        / "GetDocumentInfo.cs"
+    ).read_text()
+
+    assert "int activeObjectCount = 0;" in source
+    assert '["object_count"] = activeObjectCount' in source
+    assert '["object_count_scope"] = "active_non_phantom_objects"' in source
+    assert '["object_table_count"] = doc.Objects.Count' in source
+    assert '["objects_truncated"] = activeObjectCount > LIMIT' in source
+    assert '["object_count"] = doc.Objects.Count' not in source
+
+
+def test_serializer_resolves_layers_from_the_current_document():
+    """A _New/_Open must not leave object serialization on the old layer table."""
+    root = Path(__file__).resolve().parents[2]
+    serializer = (root / "rhinoclaw_plugin" / "Serializers" / "Serializer.cs").read_text()
+    document_info = (
+        root / "rhinoclaw_plugin" / "Functions" / "GetDocumentInfo.cs"
+    ).read_text()
+
+    assert "public static RhinoDoc doc" not in serializer
+    assert "RhinoObject(RhinoObject obj, RhinoDoc doc)" in serializer
+    assert "doc.Layers.FindIndex(obj.Attributes.LayerIndex)" in serializer
+    assert 'string layerName = "(unassigned)";' in serializer
+    assert "Serializer.RhinoObject(docObject, doc)" in document_info

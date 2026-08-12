@@ -39,10 +39,9 @@ class TestZoomSelectedSuccess:
 
         assert parsed["success"] is True
         assert "selected" in parsed["message"]
-        mock_conn.send_command.assert_called_once_with("zoom_selected", {
-            "object_ids": object_ids,
-            "viewport_name": "Perspective"
-        })
+        mock_conn.send_command.assert_called_once_with(
+            "zoom_selected", {"object_ids": object_ids}
+        )
 
     @patch("rhinoclaw.tools.zoom_selected.get_rhino_connection")
     def test_zoom_selected_no_objects(self, mock_get_conn):
@@ -57,10 +56,9 @@ class TestZoomSelectedSuccess:
         parsed = json.loads(result)
 
         assert parsed["success"] is True
-        mock_conn.send_command.assert_called_once_with("zoom_selected", {
-            "object_ids": None,
-            "viewport_name": "Perspective"
-        })
+        mock_conn.send_command.assert_called_once_with(
+            "zoom_selected", {"object_ids": None}
+        )
 
     @patch("rhinoclaw.tools.zoom_selected.get_rhino_connection")
     def test_zoom_selected_custom_viewport(self, mock_get_conn):

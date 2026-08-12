@@ -2,6 +2,8 @@
 import json
 from unittest.mock import MagicMock
 
+from rhinoclaw.utils.gh_lint import lint_definition
+
 EXTRUDE_GUID = "962034e9-cc27-4394-afc4-5c16e3447cf9"  # from the catalog
 
 
@@ -100,3 +102,78 @@ def test_slider_default_outside_range_warns():
                    "min": 0, "max": 100}])
     assert data["valid"] is True
     assert any("outside" in w for w in data["warnings"])
+
+
+def test_guid_empty_catalog_entry_is_not_authorable():
+    data = _lint([{
+        "type": "sdk_component",
+        "guid": "00000000-0000-0000-0000-000000000000",
+        "name": "UnsafeBake",
+    }])
+    assert data["valid"] is False
+    assert any("guid_empty" in error for error in data["errors"])
+
+
+def test_ports_skipped_catalog_entry_is_not_authorable():
+    guid = "22222222-2222-2222-2222-222222222222"
+    catalog = {
+        "components": [{
+            "guid": guid,
+            "name": "Synthetic skipped proxy",
+            "ports_skipped": "synthetic introspection timeout",
+        }],
+    }
+    data = lint_definition([{
+        "type": "sdk_component",
+        "guid": guid,
+        "name": "Pipeline",
+    }], catalog=catalog)
+    assert data["valid"] is False
+    assert any("ports_skipped" in error for error in data["errors"])
+
+
+def test_lint_does_not_mutate_component_specs_with_catalog_internals():
+    from copy import deepcopy
+
+    from rhinoclaw.tools.find_gh_component import _catalog
+
+    component = {
+        "type": "sdk_component",
+        "name": "Box",
+        "guid": "28061aae-04fb-4cb5-ac45-16f3b66bc0a4",
+    }
+    components = [component]
+    before = deepcopy(components)
+
+    result = lint_definition(components, [], catalog=_catalog())
+
+    assert result["valid"] is True
+    assert components == before
+    assert "_catalog" not in component
+
+
+def test_instantiate_failure_and_missing_proof_are_not_authorable():
+    failed_guid = "11111111-2222-3333-4444-555555555555"
+    unverified_guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    catalog = {"components": [
+        {
+            "guid": failed_guid,
+            "name": "Failed",
+            "instantiate_error": "CreateInstance raised FixtureError",
+        },
+        {"guid": unverified_guid, "name": "Unverified"},
+    ]}
+    result = lint_definition([
+        {"type": "sdk_component", "guid": failed_guid, "name": "Failed"},
+        {
+            "type": "sdk_component",
+            "guid": unverified_guid,
+            "name": "Unverified",
+        },
+    ], catalog=catalog)
+
+    assert result["valid"] is False
+    assert any("instantiation_failed" in error for error in result["errors"])
+    assert any(
+        "instantiation_unverified" in error for error in result["errors"]
+    )

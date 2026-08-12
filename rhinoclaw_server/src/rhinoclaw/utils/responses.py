@@ -30,14 +30,16 @@ def from_exception(
     
     Args:
         exc: The exception to convert
-        code: Explicit error code (takes precedence)
+        code: Explicit fallback code for exceptions without a structured code
         auto_detect: If True and no code provided, attempt to detect code from exception
     """
-    if code is None and auto_detect:
+    structured_code = getattr(exc, "error_code", None)
+    if isinstance(structured_code, str) and structured_code:
+        code = structured_code
+    elif code is None and auto_detect:
         code = get_connection_error_code(exc)
     elif code is None:
         code = ErrorCode.UNKNOWN_ERROR
     
     return error(str(exc), code=code)
-
 

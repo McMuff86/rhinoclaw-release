@@ -42,6 +42,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, Deque, Dict, List, Optional
 
+from rhinoclaw.config import get_settings
+
 logger = logging.getLogger("RhinoWebSocketClient")
 
 
@@ -604,15 +606,17 @@ _ws_client_lock = threading.Lock()
 
 
 def get_websocket_client(
-    host: str = "127.0.0.1",
-    port: int = 2000
+    host: Optional[str] = None,
+    port: Optional[int] = None,
 ) -> RhinoWebSocketClient:
     """
     Get or create the singleton WebSocket client.
     
     Args:
-        host: WebSocket server host
-        port: WebSocket server port
+        host: Optional explicit WebSocket server host. On first creation this
+            defaults to the shared ``RHINOCLAW_HOST`` setting used by TCP.
+        port: Optional explicit WebSocket server port. On first creation this
+            defaults to ``RHINOCLAW_WS_PORT``.
     
     Returns:
         The WebSocket client instance
@@ -621,7 +625,33 @@ def get_websocket_client(
 
     with _ws_client_lock:
         if _ws_client is None:
-            _ws_client = RhinoWebSocketClient(host=host, port=port)
+            settings = get_settings()
+            resolved_host = host if host is not None else settings.host
+            resolved_port = port if port is not None else settings.ws_port
+            _ws_client = RhinoWebSocketClient(
+                host=resolved_host,
+                port=resolved_port,
+            )
+        elif host is not None or port is not None:
+            # Default callers stay attached to the endpoint selected at first
+            # creation. That lets disconnect/status recover an active client
+            # even if tests or embedding code reload process settings later.
+            resolved_host = host if host is not None else _ws_client.host
+            resolved_port = port if port is not None else _ws_client.port
+            if (
+                _ws_client.host != resolved_host
+                or _ws_client.port != resolved_port
+            ):
+                if _ws_client.is_connected or _ws_client._running:
+                    raise RuntimeError(
+                        "WebSocket endpoint changed while the singleton "
+                        "client is active; disconnect and reset it before "
+                        "reconnecting"
+                    )
+                _ws_client = RhinoWebSocketClient(
+                    host=resolved_host,
+                    port=resolved_port,
+                )
         return _ws_client
 
 

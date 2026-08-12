@@ -97,15 +97,52 @@ class TestRecipeToolRouting:
     def test_primitive_still_goes_to_the_plugin(self):
         from rhinoclaw.tools.build_and_bake_recipe import build_and_bake_recipe
         rhino = MagicMock()
-        rhino.send_command.return_value = {"baked_count": 1, "layer": "GH_Bake",
-                                           "status": "success"}
+        guid = "28061aae-04fb-4cb5-ac45-16f3b66bc0a4"
+        rhino.send_command.side_effect = [
+            {"recipes": {"box": {"guid": guid}}},
+            {
+                "baked_count": 1,
+                "layer": "GH_Bake",
+                "status": "success",
+                "catalog_verification": {
+                    "pass": True,
+                    "schema_version": 1,
+                    "global_match": False,
+                    "scope": "used_components_only",
+                    "authoring_search_complete": False,
+                    "warning": "global drift; used component exact",
+                    "evidence": {
+                        "contract": {
+                            "schema_version": 1,
+                            "component_count": 2534,
+                            "proxy_guid_sha256": "a" * 64,
+                            "component_contract_sha256": "b" * 64,
+                        },
+                        "runtime": {
+                            "proxy_count": 2643,
+                            "proxy_guid_sha256": "c" * 64,
+                        },
+                        "used_component_count": 1,
+                        "used_components": [{
+                            "guid": guid,
+                            "requested_instances": 1,
+                            "verified_instances": 1,
+                            "proxy_present": True,
+                            "create_instance_succeeded": True,
+                            "contract_match": True,
+                        }],
+                    },
+                },
+            },
+        ]
         with patch("rhinoclaw.tools.build_and_bake_recipe.get_rhino_connection",
                    return_value=rhino):
             result = json.loads(build_and_bake_recipe(
                 MagicMock(), "box", "C:/t/box.gh", params={"x": 40}))
-        cmd, params = rhino.send_command.call_args[0]
+        cmd, params = rhino.send_command.call_args_list[1].args
         assert cmd == "build_and_bake_recipe"
         assert params["recipe"] == "box"
+        assert params["catalog_contract"]["used_components"][0]["guid"] == guid
         assert result["success"] is True
 
     def test_list_merges_both_registries(self):

@@ -6,6 +6,10 @@ from mcp.server.fastmcp import Context
 
 from rhinoclaw.server import logger, mcp
 from rhinoclaw.utils.errors import ErrorCode
+from rhinoclaw.utils.gh_catalog import (
+    catalog_contract,
+    catalog_entry_with_authorability,
+)
 from rhinoclaw.utils.responses import from_exception, ok
 
 _CATALOG_PATH = Path(__file__).parent.parent / "static" / "gh_components.json"
@@ -53,6 +57,7 @@ def find_gh_component(
     category: Optional[str] = None,
     limit: int = 8,
     include_obsolete: bool = False,
+    include_unauthorable: bool = False,
 ) -> str:
     """Look up Grasshopper components — ground truth instead of guessing.
 
@@ -74,6 +79,9 @@ def find_gh_component(
     - category: Optional filter (e.g. "Surface", "Curve", "VisualARQ").
     - limit: Max results (default 8).
     - include_obsolete: Include components flagged obsolete by GH.
+    - include_unauthorable: Include unsafe diagnostic entries (default false).
+      Such entries are never authoring ground truth and carry structured
+      `authorable: false` / `issues` fields.
 
     Returns:
         {"success": true, "data": {"matches": [{
@@ -83,8 +91,8 @@ def find_gh_component(
             "in":  [{"n": "Base", "nn": "B", "t": "Geometry"}, ...],
             "out": [{"n": "Extrusion", "nn": "E", "t": "Geometry"}],
             "desc": "..."}],
-         "catalog": {"component_count": 2534, "rhino_version": "8.31...",
-                     "generated": "2026-06-12"}}}
+         "catalog": {"component_count": 2643, "rhino_version": "8.33...",
+                     "generated": "2026-08-08"}}}
     """
     try:
         if not query or not query.strip():
@@ -95,6 +103,7 @@ def find_gh_component(
 
         catalog = _catalog()
         scored = []
+        excluded_unauthorable = 0
         for component in catalog["components"]:
             if not include_obsolete and component.get("obsolete"):
                 continue
@@ -102,13 +111,28 @@ def find_gh_component(
                 continue
             score = _score(component, q)
             if score:
-                name = component.get("name") or ""
+                candidate = catalog_entry_with_authorability(component)
+                if not include_unauthorable and not candidate["authorable"]:
+                    excluded_unauthorable += 1
+                    continue
+                name = candidate.get("name") or ""
                 # tie-break: shorter name = more canonical/specific
-                scored.append((score, len(name), name, component))
+                scored.append((score, len(name), name, candidate))
         scored.sort(key=lambda t: (-t[0], t[1], t[2]))
         matches = [c for _, _, _, c in scored[:limit]]
 
         meta = catalog.get("meta", {})
+        provenance = catalog_contract(catalog)
+        catalog_summary = {
+            "schema_version": provenance["schema_version"],
+            "component_count": provenance["component_count"],
+            "proxy_guid_sha256": provenance["proxy_guid_sha256"],
+            "component_contract_sha256":
+                provenance["component_contract_sha256"],
+            "rhino_version": meta.get("rhino_version"),
+            "generated": meta.get("generated"),
+            "runtime_validation": "required_before_authoring",
+        }
         if not matches:
             categories = sorted(
                 {c.get("cat") or "" for c in catalog["components"]} - {""})
@@ -117,17 +141,16 @@ def find_gh_component(
                         + (f" in category '{category}'" if category else ""),
                 data={"matches": [], "hint": "try fewer/other words or no "
                       "category filter", "categories": categories,
-                      "catalog": {"component_count": meta.get("component_count"),
-                                  "generated": meta.get("generated")}},
+                      "excluded_unauthorable": excluded_unauthorable,
+                      "catalog": catalog_summary},
             ))
 
         return json.dumps(ok(
             message=f"{len(matches)} match(es) for '{query}' — best: "
                     f"{matches[0]['name']} ({matches[0]['guid']})",
             data={"matches": matches,
-                  "catalog": {"component_count": meta.get("component_count"),
-                              "rhino_version": meta.get("rhino_version"),
-                              "generated": meta.get("generated")}},
+                  "excluded_unauthorable": excluded_unauthorable,
+                  "catalog": catalog_summary},
         ))
     except Exception as e:
         logger.error(f"Error searching GH components: {e}")

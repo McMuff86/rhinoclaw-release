@@ -4,8 +4,15 @@ from typing import Any, Dict, List, Optional
 from mcp.server.fastmcp import Context
 
 from rhinoclaw.server import get_rhino_connection, logger, mcp
-from rhinoclaw.utils.errors import ErrorCode
-from rhinoclaw.utils.responses import from_exception, ok
+from rhinoclaw.tools.find_gh_component import _catalog
+from rhinoclaw.utils.errors import ErrorCode, RhinoCommandError
+from rhinoclaw.utils.gh_catalog import (
+    authoring_catalog_contract,
+    catalog_verification_failure_data,
+    require_catalog_verification,
+)
+from rhinoclaw.utils.gh_lint import lint_definition
+from rhinoclaw.utils.responses import error, from_exception, ok
 
 
 @mcp.tool()
@@ -65,6 +72,15 @@ def build_gh_definition(
             code=ErrorCode.INVALID_PARAMS
         ))
 
+    catalog = _catalog()
+    lint = lint_definition(components, wires, catalog=catalog)
+    if not lint["valid"]:
+        return json.dumps(error(
+            "Grasshopper definition failed static authoring preflight",
+            code=ErrorCode.INVALID_PARAMS,
+            data={"lint": lint},
+        ))
+
     try:
         rhino = get_rhino_connection()
 
@@ -72,11 +88,16 @@ def build_gh_definition(
             "file_path": file_path,
             "components": components,
             "wires": wires or [],
+            "catalog_contract": authoring_catalog_contract(
+                catalog, components
+            ),
         }
         if description is not None:
             params["description"] = description
 
         result = rhino.send_command("build_gh_definition", params)
+        require_catalog_verification(result)
+        result["lint"] = lint
 
         status = result.get("status", "success")
         error_count = len(result.get("errors", []) or [])
@@ -86,6 +107,16 @@ def build_gh_definition(
                     f"status={status}, {error_count} error(s))",
             data=result,
         ))
+    except RhinoCommandError as e:
+        logger.error(f"Error building Grasshopper definition: {str(e)}")
+        if e.error_code == ErrorCode.VERIFICATION_FAILED:
+            return json.dumps(error(
+                str(e),
+                code=ErrorCode.VERIFICATION_FAILED,
+                data=catalog_verification_failure_data(
+                    e, mutation_attempted=True),
+            ))
+        return json.dumps(from_exception(e, code=ErrorCode.RHINO_ERROR))
     except Exception as e:
         logger.error(f"Error building Grasshopper definition: {str(e)}")
         return json.dumps(from_exception(e, code=ErrorCode.RHINO_ERROR))

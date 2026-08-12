@@ -18,6 +18,12 @@ class TestErrorCode:
         assert ErrorCode.MISSING_PARAMS == "MISSING_PARAMS"
         assert ErrorCode.INVALID_TYPE == "INVALID_TYPE"
         assert ErrorCode.INVALID_ID == "INVALID_ID"
+        assert ErrorCode.UNSUPPORTED_OPERATION == "UNSUPPORTED_OPERATION"
+        assert ErrorCode.ALREADY_EXISTS == "ALREADY_EXISTS"
+        assert ErrorCode.RESOURCE_IN_USE == "RESOURCE_IN_USE"
+        assert ErrorCode.PRECONDITION_FAILED == "PRECONDITION_FAILED"
+        assert ErrorCode.VERIFICATION_FAILED == "VERIFICATION_FAILED"
+        assert ErrorCode.PARTIAL_MUTATION == "PARTIAL_MUTATION"
 
     def test_rhino_error_codes_exist(self):
         assert ErrorCode.RHINO_ERROR == "RHINO_ERROR"

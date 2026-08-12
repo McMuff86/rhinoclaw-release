@@ -49,6 +49,11 @@ class InteractionRecord:
     # → log, NEXT-LEVEL 5.3). Separate field so the door-recipe distiller
     # never sees graph records; the future graph distiller (G4) keys on this.
     graph_outcome: Optional[Dict[str, Any]] = None
+    # Judge-measured part-placement outcome (insert_library_part →
+    # judge_part_placement → log). Third split for the same reason: the
+    # part-recipe distiller must never see door or graph records, and vice
+    # versa — one field per corpus keeps the distillers uncontaminated.
+    part_outcome: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary, excluding None values."""
@@ -213,6 +218,36 @@ class InteractionLogger:
             tool_args={},
             success=bool(outcome.get("pass")),
             graph_outcome=outcome,
+            client_model=self._client_model,
+        )
+        self._write_record(record)
+
+    def log_part_outcome(
+        self,
+        outcome: Dict[str, Any],
+        tool_name: str = "judge_part_placement",
+    ) -> None:
+        """Log a judge-measured part-placement outcome (library Phase 2).
+
+        `outcome` is the verdict for ONE placed library part, e.g.
+        ``{"part_id": "kauls/aufnahmeelement-band-stumpf-vx",
+        "context": "door-right-900", "pass": true, "det": 1.0,
+        "worst_probe_mm": 0.02, "target_frame": [...9...],
+        "xform": [...16...]}``. Same Goodhart rule as the other outcome
+        corpora: only judge-measured values (plus the caller's independent
+        ground-truth frame), never the placing agent's claims. The part
+        distiller keys on ``part_id|context``.
+        """
+        if not self._enabled:
+            return
+
+        record = InteractionRecord(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            session_id=self._session_id,
+            tool_name=tool_name,
+            tool_args={},
+            success=bool(outcome.get("pass")),
+            part_outcome=outcome,
             client_model=self._client_model,
         )
         self._write_record(record)

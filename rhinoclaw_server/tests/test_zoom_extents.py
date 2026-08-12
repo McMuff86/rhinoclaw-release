@@ -14,7 +14,10 @@ class TestZoomExtentsSuccess:
         from rhinoclaw.tools.zoom_extents import zoom_extents
 
         mock_conn = MagicMock()
-        mock_conn.send_command.return_value = {"status": "success"}
+        mock_conn.send_command.return_value = {
+            "status": "success",
+            "viewport": "Perspektive",
+        }
         mock_get_conn.return_value = mock_conn
 
         ctx = MagicMock()
@@ -22,12 +25,11 @@ class TestZoomExtentsSuccess:
         parsed = json.loads(result)
 
         assert parsed["success"] is True
-        assert "Perspective" in parsed["message"]
+        assert "Perspektive" in parsed["message"]
         assert "extents" in parsed["message"]
-        mock_conn.send_command.assert_called_once_with("zoom_extents", {
-            "viewport_name": "Perspective",
-            "include_hidden": True
-        })
+        mock_conn.send_command.assert_called_once_with(
+            "zoom_extents", {"include_hidden": True}
+        )
 
     @patch("rhinoclaw.tools.zoom_extents.get_rhino_connection")
     def test_zoom_extents_custom_viewport(self, mock_get_conn):

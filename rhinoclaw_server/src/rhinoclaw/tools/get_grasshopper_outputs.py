@@ -6,12 +6,13 @@ Useful for getting numeric results, dimensions, or other non-geometry outputs.
 """
 
 import json
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from mcp.server.fastmcp import Context
 
 from rhinoclaw.server import get_rhino_connection, logger, mcp
 from rhinoclaw.utils.errors import ErrorCode
+from rhinoclaw.utils.gh_output_targets import validate_output_targets
 from rhinoclaw.utils.responses import from_exception, ok
 
 
@@ -20,6 +21,7 @@ def get_grasshopper_outputs(
     ctx: Context,
     definition_id: str,
     output_names: Optional[List[str]] = None,
+    output_targets: Optional[List[Dict[str, str]]] = None,
 ) -> str:
     """
     Get output values from a solved Grasshopper definition.
@@ -32,15 +34,25 @@ def get_grasshopper_outputs(
         definition_id: ID returned from load_grasshopper_definition
         output_names: Optional list of output nicknames to retrieve.
                      If not specified, returns all outputs.
+        output_targets: Exact component/output instance-GUID pairs returned by
+                        load/get_grasshopper_outputs. Mutually exclusive with
+                        output_names and recommended for duplicate nicknames.
     
     Returns:
         JSON object containing:
         - definition_id: The definition ID
-        - outputs: Dictionary of outputs, keyed by "ComponentName.OutputName":
+        - schema_version: Output schema version (currently 2).
+        - outputs: Dictionary of outputs. The first friendly key is
+          "ComponentName.OutputName"; nickname collisions are retained under
+          a key suffixed with stable component/output instance GUIDs:
             - component: Source component nickname
+            - component_instance_id / output_instance_id: stable identity
             - output: Output nickname
             - type: Output type name
-            - values: Array of computed values
+            - access: item/list/tree access declared by the output
+            - values: Backward-compatible flattened/nested values
+            - paths: Explicit GH paths with indices and per-item type,
+              validity and real JSON null values
             - count: Number of values
     
     Example:
@@ -77,7 +89,10 @@ def get_grasshopper_outputs(
         - Definition must be solved first (solve_grasshopper)
         - For geometry outputs, use bake_grasshopper instead
         - Output names are matched case-insensitively
-        - Multi-branch data is returned as nested arrays
+        - Multi-branch data retains every GH_Path in `paths`; `values` remains
+          available for backward compatibility.
+        - Duplicate component/output nicknames never discard an output; use
+          component_instance_id + output_instance_id as canonical identity.
     
     See Also:
         - solve_grasshopper: Must be called first
@@ -88,6 +103,16 @@ def get_grasshopper_outputs(
             ValueError("definition_id is required"),
             code=ErrorCode.INVALID_PARAMS
         ))
+    if output_names is not None and output_targets is not None:
+        return json.dumps(from_exception(
+            ValueError("output_names and output_targets are mutually exclusive"),
+            code=ErrorCode.INVALID_PARAMS,
+        ))
+    try:
+        canonical_targets = validate_output_targets(output_targets) \
+            if output_targets is not None else None
+    except ValueError as exc:
+        return json.dumps(from_exception(exc, code=ErrorCode.INVALID_PARAMS))
 
     try:
         rhino = get_rhino_connection()
@@ -98,6 +123,8 @@ def get_grasshopper_outputs(
         
         if output_names is not None:
             params["output_names"] = output_names
+        if canonical_targets is not None:
+            params["output_targets"] = canonical_targets
 
         result = rhino.send_command("get_grasshopper_outputs", params)
 

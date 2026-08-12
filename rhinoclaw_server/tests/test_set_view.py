@@ -18,7 +18,8 @@ class TestSetViewValidation:
         parsed = json.loads(result)
 
         assert parsed["success"] is False
-        assert "RHINO_ERROR" in parsed["code"]
+        assert parsed["code"] == "INVALID_PARAMS"
+        mock_get_conn.assert_not_called()
 
 
 class TestSetViewSuccess:
@@ -29,7 +30,11 @@ class TestSetViewSuccess:
         from rhinoclaw.tools.set_view import set_view
 
         mock_conn = MagicMock()
-        mock_conn.send_command.return_value = {"status": "success"}
+        mock_conn.send_command.return_value = {
+            "status": "success",
+            "viewport": "Perspektive",
+            "verification": {"pass": True},
+        }
         mock_get_conn.return_value = mock_conn
 
         ctx = MagicMock()
@@ -37,18 +42,18 @@ class TestSetViewSuccess:
         parsed = json.loads(result)
 
         assert parsed["success"] is True
-        assert parsed["message"] == "Viewport 'Perspective' set to Top view"
-        mock_conn.send_command.assert_called_once_with("set_view", {
-            "view_type": "Top",
-            "viewport_name": "Perspective"
-        })
+        assert parsed["message"] == "Viewport 'Perspektive' set to Top view"
+        mock_conn.send_command.assert_called_once_with("set_view", {"view_type": "Top"})
 
     @patch("rhinoclaw.tools.set_view.get_rhino_connection")
     def test_set_view_custom_viewport(self, mock_get_conn):
         from rhinoclaw.tools.set_view import set_view
 
         mock_conn = MagicMock()
-        mock_conn.send_command.return_value = {"status": "success"}
+        mock_conn.send_command.return_value = {
+            "status": "success",
+            "verification": {"pass": True},
+        }
         mock_get_conn.return_value = mock_conn
 
         ctx = MagicMock()
@@ -68,7 +73,10 @@ class TestSetViewSuccess:
         from rhinoclaw.tools.set_view import set_view
 
         mock_conn = MagicMock()
-        mock_conn.send_command.return_value = {"status": "success"}
+        mock_conn.send_command.return_value = {
+            "status": "success",
+            "verification": {"pass": True},
+        }
         mock_get_conn.return_value = mock_conn
 
         ctx = MagicMock()
@@ -76,10 +84,9 @@ class TestSetViewSuccess:
         parsed = json.loads(result)
 
         assert parsed["success"] is True
-        mock_conn.send_command.assert_called_once_with("set_view", {
-            "view_type": "Perspective",
-            "viewport_name": "Perspective"
-        })
+        mock_conn.send_command.assert_called_once_with(
+            "set_view", {"view_type": "Perspective"}
+        )
 
 
 class TestSetViewError:
@@ -99,3 +106,22 @@ class TestSetViewError:
 
         assert parsed["success"] is False
         assert "RHINO_ERROR" in parsed["code"]
+
+    @patch("rhinoclaw.tools.set_view.get_rhino_connection")
+    def test_native_verification_failure_is_not_success(self, mock_get_conn):
+        from rhinoclaw.tools.set_view import set_view
+
+        mock_conn = MagicMock()
+        mock_conn.send_command.return_value = {
+            "status": "error",
+            "code": "VERIFICATION_FAILED",
+            "message": "projection mismatch",
+            "rollback": {"covered_state_restored": True},
+        }
+        mock_get_conn.return_value = mock_conn
+
+        parsed = json.loads(set_view(MagicMock(), view_type="Top"))
+
+        assert parsed["success"] is False
+        assert parsed["code"] == "VERIFICATION_FAILED"
+        assert parsed["message"] == "projection mismatch"

@@ -31,7 +31,10 @@ class TestSetCameraSuccess:
     @patch("rhinoclaw.tools.set_camera.get_rhino_connection")
     def test_set_camera_success(self, mock_get_conn):
         mock_conn = Mock()
-        mock_conn.send_command.return_value = {"status": "success"}
+        mock_conn.send_command.return_value = {
+            "status": "success",
+            "verification": {"pass": True},
+        }
         mock_get_conn.return_value = mock_conn
 
         result = set_camera(
@@ -64,3 +67,19 @@ class TestSetCameraError:
 
         assert parsed["success"] is False
         assert parsed["code"] == "RHINO_ERROR"
+
+    @patch("rhinoclaw.tools.set_camera.get_rhino_connection")
+    def test_partial_mutation_code_is_preserved(self, mock_get_conn):
+        mock_conn = Mock()
+        mock_conn.send_command.return_value = {
+            "status": "error",
+            "code": "PARTIAL_MUTATION",
+            "message": "camera restore could not be proven",
+            "rollback": {"covered_state_restored": False},
+        }
+        mock_get_conn.return_value = mock_conn
+
+        parsed = json.loads(set_camera(None, camera_location=[1, 2, 3]))
+
+        assert parsed["success"] is False
+        assert parsed["code"] == "PARTIAL_MUTATION"

@@ -11,6 +11,8 @@ future interactive author loop (NEXT-LEVEL 5.3).
 import re
 from typing import Any, Dict, List, Optional
 
+from rhinoclaw.utils.gh_catalog import catalog_entry_with_authorability
+
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 KNOWN_TYPES = {
@@ -65,6 +67,7 @@ def lint_definition(
     warnings: List[str] = []
     wires = wires or []
     guid_index = _catalog_index(catalog)
+    catalog_entries_by_component: Dict[int, Dict[str, Any]] = {}
 
     if not isinstance(components, list) or not components:
         return {"valid": False, "warnings": [],
@@ -102,7 +105,21 @@ def lint_definition(
                     "component catalog — look it up with find_gh_component "
                     "instead of guessing")
             elif entry is not None:
-                comp["_catalog"] = entry
+                candidate = catalog_entry_with_authorability(entry)
+                if not candidate["authorable"]:
+                    issue_codes = ", ".join(
+                        issue["code"] for issue in candidate["issues"]
+                    )
+                    errors.append(
+                        f"component '{label}': GUID {comp['guid']} is not "
+                        "authorable from the component catalog "
+                        f"(issues: {issue_codes}) — choose an authorable "
+                        "find_gh_component result")
+                else:
+                    # Lint is read-only. Keep the resolved catalog record in
+                    # local state instead of leaking a private `_catalog`
+                    # field into the caller's spec and eventual TCP payload.
+                    catalog_entries_by_component[id(comp)] = entry
                 if entry.get("obsolete"):
                     warnings.append(
                         f"component '{label}': '{entry.get('name')}' is "
@@ -144,7 +161,7 @@ def lint_definition(
         if ctype in _PREVIEW_TYPES:
             return list(_PREVIEW_INPUTS), len(_PREVIEW_INPUTS)
         if ctype in _SDK_TYPES:
-            entry = comp.get("_catalog")
+            entry = catalog_entries_by_component.get(id(comp))
             if entry is None:
                 return None, None
             ports = entry.get("in") or []
@@ -156,7 +173,7 @@ def lint_definition(
         if ctype in _SCRIPT_TYPES:
             return _script_outputs(comp)
         if ctype in _SDK_TYPES:
-            entry = comp.get("_catalog")
+            entry = catalog_entries_by_component.get(id(comp))
             return _port_names(entry.get("out")) if entry else None
         return None  # sliders etc. emit their single value
 
