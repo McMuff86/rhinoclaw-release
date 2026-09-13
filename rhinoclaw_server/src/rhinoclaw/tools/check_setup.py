@@ -96,10 +96,15 @@ def rhinoclaw_doctor(ctx: Context) -> str:
             "plugin was started with (the plugin reads it only at Rhino "
             "start). Check with `get_auth_status`.",
         ))
+        return json.dumps(ok("Doctor stopped after authentication failure; no further authenticated probes attempted",
+                             data={"ready": False, "summary": "1 FAIL (auth)", "checks": checks}))
 
     # 2b. UI state — an invisible modal dialog blocks every mutating call.
     try:
-        ui_data = json.loads(get_ui_state(ctx)).get("data", {})
+        ui_response = json.loads(get_ui_state(ctx))
+        ui_data = ui_response.get("data", {})
+        if ui_response.get("success") is not True or not isinstance(ui_data.get("busy"), bool):
+            raise RuntimeError("UI readiness was not established by get_ui_state")
         if ui_data.get("busy"):
             checks.append(_check(
                 "ui_state", "WARN", ui_data.get("diagnosis", "Rhino is busy"),
@@ -111,11 +116,11 @@ def rhinoclaw_doctor(ctx: Context) -> str:
                 "ui_state", "PASS", "UI thread idle — no modal dialog, no "
                 "running command"))
     except Exception as e:
-        checks.append(_check("ui_state", "SKIP", f"probe failed: {e}"))
+        checks.append(_check("ui_state", "FAIL", f"probe failed: {e}", "Inspect get_ui_state and the Rhino screen before sending mutations."))
 
     # 3. Version match ("0.5.0.0" ↔ "0.5.0").
     plugin_version = str(hello.get("plugin_version", "?"))
-    if plugin_version.startswith(server_version):
+    if plugin_version.split(".")[:3] == server_version.split(".")[:3]:
         checks.append(_check(
             "version", "PASS",
             f"Plugin {plugin_version} ↔ Server {server_version}"))
@@ -123,7 +128,7 @@ def rhinoclaw_doctor(ctx: Context) -> str:
         checks.append(_check(
             "version", "WARN",
             f"Plugin {plugin_version} ≠ Server {server_version}",
-            "Rebuild + redeploy the plugin (scripts/deploy.ps1) or update "
+            "Rebuild + install locally (scripts/build-and-install.ps1 -SkipPull -NoPrompt; use -RhinoMajor 9 for Rhino 9) or update "
             "the server (`uv sync` / reinstall) so both sides match.",
         ))
 

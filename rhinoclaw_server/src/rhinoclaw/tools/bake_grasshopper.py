@@ -6,7 +6,7 @@ Grasshopper outputs.
 """
 
 import json
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 from mcp.server.fastmcp import Context
 
 from rhinoclaw.server import get_rhino_connection, logger, mcp
@@ -16,6 +16,11 @@ from rhinoclaw.utils.gh_bake_verification import (
     verify_active_object_readback,
 )
 from rhinoclaw.utils.gh_output_targets import validate_output_targets
+from rhinoclaw.utils.gh_bim_verification import (
+    validate_bim_expectation,
+    verify_bim_bake,
+)
+from rhinoclaw.tools.visualarq import va_get_object
 from rhinoclaw.utils.responses import error, from_exception, ok
 
 
@@ -60,6 +65,10 @@ def bake_grasshopper(
     component_names: Optional[List[str]] = None,
     output_targets: Optional[List[Dict[str, str]]] = None,
     layer: Optional[str] = None,
+    expected_visualarq_kind: Optional[Literal["wall", "slab", "space", "door", "window"]] = None,
+    expected_count: Optional[int] = None,
+    expected_style_id: Optional[str] = None,
+    expected_host_id: Optional[str] = None,
 ) -> str:
     """
     Bake output geometry from a solved Grasshopper definition to Rhino.
@@ -78,6 +87,15 @@ def bake_grasshopper(
                         recommended selector when nicknames may collide.
         layer: Optional layer name for the baked geometry.
                Creates the layer if it doesn't exist.
+        expected_visualarq_kind: Require actual VisualARQ products of this kind,
+               not lookalike Breps. Requires exact output_targets and native
+               BakeAware output items; prepare the target layer first.
+               Independently reads each product, its style and domain data.
+               Doors/windows also require a readable active VisualARQ wall host.
+        expected_count: Optional exact product count for the BIM batch.
+        expected_style_id: Optional required BIM style GUID for all products.
+        expected_host_id: Optional required host wall GUID for doors/windows.
+               Count/style/host expectations require expected_visualarq_kind.
     
     Returns:
         JSON object containing:
@@ -118,9 +136,22 @@ def bake_grasshopper(
     Notes:
         - Definition must be solved first (solve_grasshopper)
         - Supports Brep, Surface, Mesh, Curve, Point, Line geometry
-        - Objects supporting IGH_BakeAwareData use native baking
+        - Exact ``output_targets`` whose items implement IGH_BakeAwareData
+          use the guarded document-baseline/ownership path. Every item is
+          invoked exactly once; mixed BakeAware/geometry batches fail before
+          mutation and must be submitted separately.
+        - Guarded BakeAware calls may target only an existing layer. Their
+          evidence covers active objects, layers, instance definitions and
+          the current layer; VisualARQ-private state remains explicitly
+          unmeasured and a post-mutation failure is always PARTIAL_MUTATION.
         - Created layer inherits default layer properties
         - Returns GUIDs of all created Rhino objects
+        - BIM mismatch/readback failure returns PARTIAL_MUTATION with retained
+          IDs; never automatically retries or deletes potentially related BIM
+          objects. Inspect the evidence before modifying or baking again.
+        - BIM verification does not prove a host cut, level membership, IFC
+          round-trip or rollback of VisualARQ-private state. Use va_create_door
+          / va_create_window when verified host cutting is required.
     
     See Also:
         - solve_grasshopper: Must be called first
@@ -141,6 +172,10 @@ def bake_grasshopper(
     try:
         canonical_targets = validate_output_targets(output_targets) \
             if output_targets is not None else None
+        bim_expectation = validate_bim_expectation(
+            expected_visualarq_kind, expected_count, expected_style_id,
+            expected_host_id, canonical_targets,
+        )
     except ValueError as exc:
         return json.dumps(from_exception(exc, code=ErrorCode.INVALID_PARAMS))
 
@@ -159,9 +194,25 @@ def bake_grasshopper(
             params["output_targets"] = canonical_targets
         if layer is not None:
             params["layer"] = layer
+        if bim_expectation is not None:
+            params["require_bake_aware"] = True
 
         bake_sent = True
         result = rhino.send_command("bake_grasshopper", params)
+
+        bake_status = result.get("bake_status")
+        if bake_status == "preflight_failed":
+            return json.dumps(error(
+                result.get("failure", "Guarded BakeAware preflight failed"),
+                code=ErrorCode.PRECONDITION_FAILED,
+                data=result,
+            ))
+        if bake_status == "failed_after_mutation":
+            return json.dumps(error(
+                result.get("failure", "Guarded BakeAware bake failed"),
+                code=ErrorCode.PARTIAL_MUTATION,
+                data=result,
+            ))
 
         baked_ids, contract_issues = _canonical_baked_ids(result)
         baked_count = result.get("baked_count", 0)
@@ -201,6 +252,27 @@ def bake_grasshopper(
                 code=ErrorCode.PARTIAL_MUTATION,
                 data=result,
             ))
+
+        if bim_expectation is not None:
+            bim = verify_bim_bake(
+                baked_ids, bim_expectation,
+                lambda object_id, kind: va_get_object(
+                    ctx, object_id=object_id, expected_kind=kind),
+            )
+            if (result.get("guarded_bake_aware") is not True
+                    or result.get("bake_mode") != "guarded_bake_aware"
+                    or result.get("bake_status") != "success"):
+                bim["issues"].append("Plugin did not confirm the guarded native BakeAware route")
+                bim["pass"] = False
+            result["bim_verification"] = bim
+            verification["pass"] = bim["pass"]
+            verification["issues"].extend(bim["issues"])
+            if not bim["pass"]:
+                return json.dumps(error(
+                    "Baked objects did not pass the VisualARQ BIM contract; "
+                    "objects retained, inspect before retrying",
+                    code=ErrorCode.PARTIAL_MUTATION, data=result,
+                ))
 
         layer_name = result.get("layer", "Default")
         

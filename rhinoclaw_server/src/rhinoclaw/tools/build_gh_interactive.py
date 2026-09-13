@@ -112,6 +112,12 @@ def build_gh_interactive(
     """ONE authoring/critic iteration — lint, build+bake, inspect, measure,
     critique, cleanup and log (NEXT-LEVEL 5.3).
 
+    Geometry critic only: this tool does not verify VisualARQ BIM identity.
+    For Walls/Slabs/Spaces/Doors/Windows use native va_create_* tools or
+    build_gh_definition -> load -> exact parameter batch -> solve ->
+    bake_grasshopper(output_targets=..., expected_visualarq_kind=...).
+    Never describe a passing Brep/solid geometry verdict as a BIM verdict.
+
     You (the agent) author the graph; this tool is the iteration engine
     that tells you deterministically what is wrong with it. Per call:
 
@@ -150,7 +156,7 @@ def build_gh_interactive(
     - bake_output: Output nickname to bake. Omit to auto-derive from the
       catalog (recommended); pass explicitly to pin it.
     - expect: Optional measurable expectations:
-      `{"min_count": 1, "dims_mm": [40,20,10], "all_valid": true,
+      `{"exact_count": 1, "dims_mm": [40,20,10], "all_valid": true,
         "all_solid": true, "total_volume": 8000,
         "topology": {"face_count": 6}, "layer": "GH_Bake"}`.
       Supported semantic checks include measured geometry/object types,
@@ -667,7 +673,14 @@ def build_gh_interactive(
         if expect:
             expect_check = check_expectations(
                 bbox, measured["count"], expect, semantics)
-            hints.extend(expect_check["hints"])
+            expect_check["measurement_available"] = not active_readback_issues
+            if active_readback_issues:
+                # The iteration already fails on independent readback.  Keep
+                # the checks for diagnostics, but do not mislabel an unknown
+                # cardinality as a graph/output-tree defect.
+                expect_check["hints"] = []
+            else:
+                hints.extend(expect_check["hints"])
 
         passed = (
             build["status"] == "success"

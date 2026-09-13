@@ -22,20 +22,16 @@ def test_execute_rhinoscript_owns_non_nested_undo_record() -> None:
     assert '"execute_rhinoscript_python_code"' in undo_free_block
 
 
-def test_failed_script_adds_marker_before_undo() -> None:
+def test_failed_script_uses_shared_owned_transaction() -> None:
     handler = HANDLER.read_text(encoding="utf-8")
-
-    marker = handler.index("doc.AddCustomUndoEvent(")
-    end_record = handler.index("doc.EndUndoRecord(undoRecordSerialNumber)")
-    undo = handler.index("undoRecordSerialNumber > 0 && doc.Undo()")
-
-    assert marker < end_record < undo
-    assert "rollback_performed" in handler
-    assert "if (undoRecordSerialNumber > 0)" in handler
+    # Behavior is exercised by the C# UndoRecordTests, including a failed
+    # empty script after prior work. This checks both engines use that path.
+    assert "OwnedUndoRecord.ExecuteScript(" in handler
+    assert "doc.BeginUndoRecord(" not in handler
 
 
 def test_failed_script_has_no_unconditional_undo() -> None:
     handler = HANDLER.read_text(encoding="utf-8")
 
     assert "\n            doc.Undo();" not in handler
-    assert "undoRecordSerialNumber > 0 && doc.Undo()" in handler
+    assert "doc.Undo()" not in handler

@@ -34,7 +34,7 @@ _SEMANTIC_EXPECTATION_KEYS = {
     "topology",
 }
 _MEASURABLE_EXPECTATION_KEYS = _SEMANTIC_EXPECTATION_KEYS | {
-    "min_count", "dims_mm", "bbox_min", "bbox_max",
+    "min_count", "exact_count", "dims_mm", "bbox_min", "bbox_max",
 }
 _TOLERANCE_KEYS = {
     "tolerance_mm", "volume_tolerance", "area_tolerance",
@@ -158,6 +158,25 @@ def validate_expectations(expect: Any) -> List[str]:
     ):
         errors.append("expect.min_count must be a non-negative integer")
 
+    exact_count = expect.get("exact_count")
+    if "exact_count" in expect and (
+        isinstance(exact_count, bool)
+        or not isinstance(exact_count, int)
+        or exact_count <= 0
+    ):
+        errors.append("expect.exact_count must be a positive integer")
+
+    if (
+        isinstance(min_count, int)
+        and not isinstance(min_count, bool)
+        and isinstance(exact_count, int)
+        and not isinstance(exact_count, bool)
+        and min_count > exact_count
+    ):
+        errors.append(
+            "expect.min_count cannot be greater than expect.exact_count"
+        )
+
     for key in ("dims_mm", "bbox_min", "bbox_max"):
         vector = expect.get(key)
         if vector is None:
@@ -248,6 +267,7 @@ def check_expectations(
 
     `expect` keys (all optional):
     - ``min_count``: at least N baked objects.
+    - ``exact_count``: exactly N independently read-back baked objects (N > 0).
     - ``dims_mm``: [dx, dy, dz] expected bbox extents (world axes).
     - ``bbox_min`` / ``bbox_max``: expected bbox corners.
     - ``tolerance_mm``: allowed deviation for dims/corners (default 1.0).
@@ -281,6 +301,19 @@ def check_expectations(
             hints.append(
                 f"Expected ≥{min_count} baked object(s), measured "
                 f"{baked_count} — the graph solves but bakes too little."
+            )
+
+    exact_count = expect.get("exact_count")
+    if exact_count is not None:
+        ok = baked_count == int(exact_count)
+        checks.append({"check": "exact_count", "ok": ok,
+                       "expected": int(exact_count),
+                       "measured": baked_count})
+        if not ok:
+            hints.append(
+                f"Expected exactly {exact_count} baked object(s), measured "
+                f"{baked_count} — inspect the explicit output tree and bake "
+                "target for missing or surplus items."
             )
 
     dims = bbox_dims(measured_bbox)

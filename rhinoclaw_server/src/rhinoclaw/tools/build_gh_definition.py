@@ -5,6 +5,7 @@ from mcp.server.fastmcp import Context
 
 from rhinoclaw.server import get_rhino_connection, logger, mcp
 from rhinoclaw.tools.find_gh_component import _catalog
+from rhinoclaw.tools.load_grasshopper_definition import load_grasshopper_definition
 from rhinoclaw.utils.errors import ErrorCode, RhinoCommandError
 from rhinoclaw.utils.gh_catalog import (
     authoring_catalog_contract,
@@ -22,6 +23,7 @@ def build_gh_definition(
     components: List[Dict[str, Any]],
     wires: Optional[List[Dict[str, Any]]] = None,
     description: Optional[str] = None,
+    show_in_grasshopper: bool = False,
 ) -> str:
     """Build a Grasshopper definition (.gh) file programmatically.
 
@@ -40,11 +42,21 @@ def build_gh_definition(
         panel:          {"type":"panel","name":"Label","value":"hello","position":[50,240]}
         python3_script: {"type":"python3_script","name":"MyScript","code":"...","inputs":["Width","Height"],"extra_outputs":["b"],"position":[450,160]}
         sdk_component:  {"type":"sdk_component","guid":"28061aae-...","name":"CenterBox","position":[450,160]}
+        referenced curve parameter: add
+            {"reference_object_id":"<active Rhino curve GUID>"} to the
+            catalog-resolved standalone Curve SDK component; the saved graph
+            retains a live Rhino reference like Grasshopper's Set one Curve.
     - wires: Connections between components. Each:
         {"from":"Width","to":"MyScript","to_input":"Width"}
         {"from":"MyScript","from_output":"a","to":"Preview","to_input":0}
       Optional — omit (or pass []) for a single-component definition.
     - description: Optional definition description.
+    - show_in_grasshopper: After a clean build, load the saved graph and show
+      it on the user's canvas. The returned presentation.data.definition_id
+      addresses that live instance for subsequent edits/solves. Nodes/wires
+      appear after authoring completes, not as an animated node-by-node build.
+      An already-open destination path is rejected to protect unsaved work;
+      use a fresh iteration path. Default False keeps author-only behavior.
 
     Returns:
         {"success": true, "message": "...", "data": {
@@ -54,6 +66,9 @@ def build_gh_definition(
     Note: a `data.status` of "success_with_errors" means the file was written
     but some components/wires reported problems — inspect `data.errors`.
     """
+    if not isinstance(show_in_grasshopper, bool):
+        return json.dumps(from_exception(
+            ValueError("show_in_grasshopper must be a boolean"), code=ErrorCode.INVALID_PARAMS))
     if not file_path:
         return json.dumps(from_exception(
             ValueError("file_path is required"),
@@ -101,6 +116,18 @@ def build_gh_definition(
 
         status = result.get("status", "success")
         error_count = len(result.get("errors", []) or [])
+        if show_in_grasshopper:
+            if status != "success" or error_count:
+                return json.dumps(error(
+                    "Graph authoring was not clean; presentation was not attempted",
+                    code=ErrorCode.VERIFICATION_FAILED, data=result))
+            presentation = json.loads(load_grasshopper_definition(
+                ctx, file_path, show_in_grasshopper=True))
+            result["presentation"] = presentation
+            if presentation.get("success") is not True:
+                return json.dumps(error(
+                    "Graph file written, but loading/presentation failed; inspect retained artifact and definition_id before retrying",
+                    code=ErrorCode.VERIFICATION_FAILED, data=result))
         return json.dumps(ok(
             message=f"Built GH definition: {file_path} "
                     f"({result.get('object_count', 0)} components, "

@@ -16,6 +16,7 @@ CATALOG_OK = {
     "pass": True,
     "schema_version": 1,
     "global_match": True,
+    "catalog_port_inventory_complete": True,
     "scope": "full_catalog",
     "authoring_search_complete": True,
     "evidence": {
@@ -24,6 +25,7 @@ CATALOG_OK = {
             "component_count": 2534,
             "proxy_guid_sha256": "a" * 64,
             "component_contract_sha256": "b" * 64,
+            "ports_skipped_guids": [],
         },
         "runtime": {"proxy_count": 2534, "proxy_guid_sha256": "a" * 64},
         "used_component_count": 0,

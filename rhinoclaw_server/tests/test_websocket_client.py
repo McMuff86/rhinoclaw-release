@@ -1,8 +1,7 @@
 """Tests for WebSocket client."""
 
 import asyncio
-from datetime import datetime
-from unittest.mock import MagicMock
+import json
 
 import pytest
 
@@ -72,6 +71,61 @@ class TestWebSocketEvent:
 
 class TestRhinoWebSocketClient:
     """Tests for RhinoWebSocketClient."""
+
+    @pytest.mark.asyncio
+    async def test_connect_starts_receiver_before_correlated_state_request(
+        self,
+        ws_client,
+        monkeypatch,
+    ):
+        """connect() alone must make request/response APIs operational."""
+        import websockets
+
+        class QueueWebSocket:
+            def __init__(self):
+                self.messages = asyncio.Queue()
+                self.messages.put_nowait(json.dumps({
+                    "type": "Connected",
+                    "current_prompt": "",
+                }))
+
+            async def recv(self):
+                return await self.messages.get()
+
+            async def send(self, message):
+                request = json.loads(message)
+                if request.get("command") == "get_state":
+                    self.messages.put_nowait(json.dumps({
+                        "type": "State",
+                        "request_id": request["request_id"],
+                        "current_prompt": "",
+                        "in_command": 0,
+                        "command_idle": True,
+                        "command_stack": [],
+                    }))
+
+            async def close(self):
+                return None
+
+        websocket = QueueWebSocket()
+
+        async def connect(*args, **kwargs):
+            return websocket
+
+        monkeypatch.setattr(websockets, "connect", connect)
+
+        assert await ws_client.connect() is True
+        assert ws_client._running is True
+        assert ws_client._listen_task is not None
+        try:
+            assert await ws_client.get_state(timeout=0.2) == {
+                "current_prompt": "",
+                "in_command": 0,
+                "command_idle": True,
+                "command_stack": [],
+            }
+        finally:
+            await ws_client.disconnect()
 
     def test_init_defaults(self, ws_client):
         """Test client initializes with correct defaults."""
@@ -253,6 +307,379 @@ class TestRhinoWebSocketClient:
         
         # Should still be 1 (callback removed)
         assert len(received) == 1
+
+    async def test_get_state_captures_first_state_emitted_during_send(
+        self,
+        ws_client,
+    ):
+        """An immediate State response is captured exactly once."""
+
+        class ImmediateStateWebSocket:
+            callback_count_during_send = None
+            payload = None
+
+            async def send(self, message):
+                self.payload = json.loads(message)
+                self.callback_count_during_send = len(ws_client._callbacks)
+                for raw in (
+                    {
+                        "type": "State",
+                        "request_id": "mismatched-request",
+                        "current_prompt": "Stale",
+                        "in_command": 9,
+                        "command_idle": False,
+                        "command_stack": ["Stale"],
+                    },
+                    {
+                        "type": "State",
+                        "request_id": self.payload["request_id"],
+                        "current_prompt": "Command:",
+                        "in_command": 0,
+                        "command_idle": True,
+                        "command_stack": [],
+                    },
+                    {
+                        "type": "State",
+                        "request_id": self.payload["request_id"],
+                        "current_prompt": "Later state must be ignored",
+                        "in_command": 1,
+                        "command_idle": False,
+                        "command_stack": ["Later"],
+                    },
+                ):
+                    ws_client._handle_event(WebSocketEvent(
+                        event_type="State",
+                        text="",
+                        timestamp="2026-08-16T00:00:00",
+                        raw=raw,
+                    ))
+
+        websocket = ImmediateStateWebSocket()
+        ws_client._websocket = websocket
+        ws_client._connected = True
+
+        result = await asyncio.wait_for(
+            ws_client.get_state(timeout=10.0),
+            timeout=0.2,
+        )
+
+        assert result == {
+            "current_prompt": "Command:",
+            "in_command": 0,
+            "command_idle": True,
+            "command_stack": [],
+        }
+        assert websocket.payload["command"] == "get_state"
+        assert isinstance(websocket.payload["request_id"], str)
+        assert websocket.callback_count_during_send == 1
+        assert ws_client._callbacks == []
+
+    async def test_get_state_rejects_malformed_typed_state(self, ws_client):
+        """A matching but malformed state response fails closed."""
+
+        class MalformedStateWebSocket:
+            async def send(self, message):
+                payload = json.loads(message)
+                ws_client._handle_event(WebSocketEvent(
+                    event_type="State",
+                    text="",
+                    timestamp="2026-08-16T00:00:00",
+                    raw={
+                        "type": "State",
+                        "request_id": payload["request_id"],
+                        "current_prompt": None,
+                        "in_command": "0",
+                        "command_idle": True,
+                        "command_stack": [],
+                    },
+                ))
+
+        ws_client._websocket = MalformedStateWebSocket()
+        ws_client._connected = True
+
+        assert await ws_client.get_state(timeout=0.2) is None
+        assert ws_client._callbacks == []
+
+    async def test_get_state_cleans_callback_when_send_fails(self, ws_client):
+        """A get_state send exception must remove its response callback."""
+
+        class FailingWebSocket:
+            async def send(self, message):
+                raise RuntimeError("send failed")
+
+        ws_client._websocket = FailingWebSocket()
+        ws_client._connected = True
+
+        result = await ws_client.get_state()
+
+        assert result is None
+        assert ws_client._callbacks == []
+
+    async def test_get_state_cleans_callback_after_timeout(self, ws_client):
+        """A missing State response must time out without leaking a callback."""
+
+        class SilentWebSocket:
+            async def send(self, message):
+                return None
+
+        ws_client._websocket = SilentWebSocket()
+        ws_client._connected = True
+
+        result = await ws_client.get_state(timeout=0.001)
+
+        assert result is None
+        assert ws_client._callbacks == []
+
+    async def test_wait_for_command_idle_observes_active_then_idle(
+        self,
+        ws_client,
+    ):
+        """Delayed start cannot be mistaken for command completion."""
+        states = iter([
+            {"current_prompt": "", "in_command": 0,
+             "command_idle": True, "command_stack": []},
+            {"current_prompt": "Startpunkt", "in_command": 1,
+             "command_idle": False, "command_stack": ["vaWall"]},
+            {"current_prompt": "", "in_command": 1,
+             "command_idle": False, "command_stack": ["vaWall"]},
+            {"current_prompt": "Command", "in_command": 0,
+             "command_idle": True, "command_stack": []},
+        ])
+
+        async def next_state(timeout):
+            del timeout
+            return next(states)
+
+        ws_client.get_state = next_state
+        result = await ws_client.wait_for_command_idle(
+            timeout=0.2,
+            poll_interval=0.001,
+            require_observed_active=True,
+        )
+
+        assert result is not None
+        assert result["in_command"] == 0
+
+    async def test_wait_for_command_idle_times_out_while_active(
+        self,
+        ws_client,
+    ):
+        """A blank prompt with positive command depth never passes."""
+
+        async def active_state(timeout):
+            del timeout
+            return {
+                "current_prompt": "",
+                "in_command": 1,
+                "command_idle": False,
+                "command_stack": ["vaWall"],
+            }
+
+        ws_client.get_state = active_state
+        result = await ws_client.wait_for_command_idle(
+            timeout=0.01,
+            poll_interval=0.001,
+        )
+
+        assert result is None
+
+    async def test_run_script_captures_completion_emitted_during_send(
+        self,
+        ws_client,
+    ):
+        """A completion delivered by send itself must not be lost."""
+
+        class ImmediateCompletionWebSocket:
+            callback_count_during_send = None
+
+            async def send(self, message):
+                payload = json.loads(message)
+                self.callback_count_during_send = len(ws_client._callbacks)
+                ws_client._handle_event(WebSocketEvent(
+                    event_type="ScriptCompleted",
+                    text="",
+                    timestamp="2026-08-16T00:00:00",
+                    raw={
+                        "type": "ScriptCompleted",
+                        "request_id": payload["request_id"],
+                        "success": True,
+                    },
+                ))
+
+        websocket = ImmediateCompletionWebSocket()
+        ws_client._websocket = websocket
+        ws_client._connected = True
+
+        result = await asyncio.wait_for(
+            ws_client.run_script(
+                "_-Echo test",
+                wait_for_completion=True,
+                timeout=10.0,
+            ),
+            timeout=0.2,
+        )
+
+        assert result is True
+        assert websocket.callback_count_during_send == 1
+        assert ws_client._callbacks == []
+
+    async def test_run_script_without_completion_waits_for_started_ack(
+        self,
+        ws_client,
+    ):
+        """Non-blocking mode proves server acceptance, not just frame send."""
+
+        class ImmediateStartedWebSocket:
+            callback_count_during_send = None
+
+            async def send(self, message):
+                payload = json.loads(message)
+                self.callback_count_during_send = len(ws_client._callbacks)
+                ws_client._handle_event(WebSocketEvent(
+                    event_type="ScriptStarted",
+                    text="",
+                    timestamp="2026-08-16T00:00:00",
+                    raw={
+                        "type": "ScriptStarted",
+                        "request_id": payload["request_id"],
+                    },
+                ))
+
+        websocket = ImmediateStartedWebSocket()
+        ws_client._websocket = websocket
+        ws_client._connected = True
+
+        result = await ws_client.run_script(
+            "_-Echo test",
+            wait_for_completion=False,
+            timeout=0.2,
+        )
+
+        assert result is True
+        assert websocket.callback_count_during_send == 1
+        assert ws_client._callbacks == []
+
+    async def test_run_script_without_completion_rejects_silent_server(
+        self,
+        ws_client,
+    ):
+        """A sent frame without ScriptStarted is not a started command."""
+
+        class SilentWebSocket:
+            async def send(self, message):
+                del message
+
+        ws_client._websocket = SilentWebSocket()
+        ws_client._connected = True
+
+        result = await ws_client.run_script(
+            "_-Echo test",
+            wait_for_completion=False,
+            timeout=0.001,
+        )
+
+        assert result is False
+        assert ws_client._callbacks == []
+
+    async def test_run_script_cleans_callback_after_immediate_script_error(
+        self,
+        ws_client,
+    ):
+        """A matching ScriptError completes promptly and removes its callback."""
+
+        class ImmediateErrorWebSocket:
+            async def send(self, message):
+                payload = json.loads(message)
+                ws_client._handle_event(WebSocketEvent(
+                    event_type="ScriptError",
+                    text="script failed",
+                    timestamp="2026-08-16T00:00:00",
+                    raw={
+                        "type": "ScriptError",
+                        "request_id": payload["request_id"],
+                        "success": False,
+                    },
+                ))
+
+        ws_client._websocket = ImmediateErrorWebSocket()
+        ws_client._connected = True
+
+        result = await asyncio.wait_for(
+            ws_client.run_script(
+                "_-FailForTest",
+                wait_for_completion=True,
+                timeout=10.0,
+            ),
+            timeout=0.2,
+        )
+
+        assert result is False
+        assert ws_client._callbacks == []
+
+    async def test_run_script_cleans_callback_when_send_fails(self, ws_client):
+        """A send exception must not leave a completion callback registered."""
+
+        class FailingWebSocket:
+            async def send(self, message):
+                raise RuntimeError("send failed")
+
+        ws_client._websocket = FailingWebSocket()
+        ws_client._connected = True
+
+        result = await ws_client.run_script(
+            "_-Echo test",
+            wait_for_completion=True,
+        )
+
+        assert result is False
+        assert ws_client._callbacks == []
+
+    async def test_run_script_cleans_callback_after_timeout(self, ws_client):
+        """A missing completion must time out without leaking its callback."""
+
+        class SilentWebSocket:
+            async def send(self, message):
+                return None
+
+        ws_client._websocket = SilentWebSocket()
+        ws_client._connected = True
+
+        result = await ws_client.run_script(
+            "_-Echo test",
+            wait_for_completion=True,
+            timeout=0.001,
+        )
+
+        assert result is False
+        assert ws_client._callbacks == []
+
+    async def test_cancel_waits_for_correlated_ack(self, ws_client):
+        """Cancel success means the server accepted the literal cancel key."""
+
+        class ImmediateCancelWebSocket:
+            payload = None
+
+            async def send(self, message):
+                self.payload = json.loads(message)
+                ws_client._handle_event(WebSocketEvent(
+                    event_type="CancelResult",
+                    text="",
+                    timestamp="2026-08-16T00:00:00",
+                    raw={
+                        "type": "CancelResult",
+                        "request_id": self.payload["request_id"],
+                        "success": True,
+                    },
+                ))
+
+        websocket = ImmediateCancelWebSocket()
+        ws_client._websocket = websocket
+        ws_client._connected = True
+
+        assert await ws_client.cancel(timeout=0.2) is True
+        assert websocket.payload["command"] == "cancel"
+        assert ws_client._pending_requests == {}
+        assert ws_client._pending_responses == {}
 
 
 class TestSingletonClient:

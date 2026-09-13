@@ -46,6 +46,30 @@ def test_csharp_output_targets_resolve_before_bake_mutation():
         in bake_source
 
 
+def test_exact_bakeaware_targets_use_shared_guard_and_fail_closed_batches():
+    source = SOURCE.read_text(encoding="utf-8")
+    bake_start = source.index("public JObject BakeGrasshopper")
+    output_start = source.index("public JObject GetGrasshopperOutputs")
+    bake_source = source[bake_start:output_start]
+
+    assert "EnumerateGhBakeItems(selectedOutputs)" in bake_source
+    assert "mixed BakeAware/non-BakeAware" in bake_source
+    assert bake_source.index("mixed BakeAware/non-BakeAware") < \
+        bake_source.index("// Get or create target layer")
+    assert "BakeGuardedBakeAwareItems(" in bake_source
+    assert "Guarded BakeAware output requires an existing layer" in \
+        bake_source
+    assert "GrasshopperBakeService.CaptureDocumentBaseline(doc)" in source
+    assert "GrasshopperBakeService.BakeSingleNativeItem(" in source
+    assert source.index("doc.Views.Redraw();", source.index(
+        "private static JObject BakeGuardedBakeAwareItems")) < source.index(
+        '"after_guarded_bake_redraw"')
+    assert "CleanupGuardedBakeAwareBatch(" in source
+    assert ".Reverse()" in source
+    assert '["bake_mode"] = "guarded_bake_aware"' in source
+    assert '"visualarq_plugin_private_state"' in source
+
+
 def test_csharp_output_reader_covers_standalone_params_and_exact_targets():
     source = SOURCE.read_text(encoding="utf-8")
 
@@ -81,7 +105,9 @@ def test_python_wrapper_retains_v2_tree_and_disambiguated_outputs():
                 "count": 2,
                 "values": [1.0, None],
                 "items": [
-                    {"index": 0, "value": 1.0, "is_null": False},
+                    {"index": 0, "value": 1.0, "is_null": False, "geometry": {
+                        "type": "Box", "bbox_dimensions": [600, 300, 150], "volume": 27000000,
+                        "source": "live_unbaked_gh_geometry", "length_units": "Millimeters"}},
                     {"index": 1, "value": None, "is_null": True},
                 ],
             },
@@ -132,4 +158,5 @@ def test_python_wrapper_retains_v2_tree_and_disambiguated_outputs():
     assert list(data["outputs"]) == ["A.R", second_key]
     assert data["outputs"]["A.R"]["paths"][0]["indices"] == [0, 2]
     assert data["outputs"]["A.R"]["paths"][0]["values"][1] is None
+    assert data["outputs"]["A.R"]["paths"][0]["items"][0]["geometry"] == first["paths"][0]["items"][0]["geometry"]
     assert data["outputs"][second_key]["key_disambiguated"] is True

@@ -83,11 +83,16 @@ def get_grasshopper_outputs(
         - Planes: Returned as {"origin": {...}, "normal": {...}}
         - Colors: Returned as {"r": int, "g": int, "b": int, "a": int}
         - Intervals: Returned as {"min": float, "max": float}
-        - Geometry: Returned as description string (use bake_grasshopper instead)
+        - Geometry: Legacy descriptions remain in values. paths[].items[].geometry
+          adds live Box/Brep/wrapped Extrusion summaries with validity, closed_solid,
+          bbox_min/max/dimensions and volume. Boxes also report box_axis_lengths.
+          Lengths use active document units and volumes their cube; rotated boxes'
+          world bounding dimensions differ from their intrinsic axis lengths.
     
     Notes:
         - Definition must be solved first (solve_grasshopper)
-        - For geometry outputs, use bake_grasshopper instead
+        - Geometry readback does not require baking. A null geometry summary means
+          that the output type has no supported quantitative summary.
         - Output names are matched case-insensitively
         - Multi-branch data retains every GH_Path in `paths`; `values` remains
           available for backward compatibility.

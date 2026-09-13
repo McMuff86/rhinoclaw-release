@@ -2,6 +2,7 @@
 Tests for the capture_viewport tool.
 """
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -317,6 +318,10 @@ class TestCaptureViewportStorageRouting:
         assert sent_params["filename"] == filename
 
     @patch("rhinoclaw.tools.capture_viewport.get_rhino_connection")
+    @pytest.mark.skipif(
+        os.name == "nt",
+        reason="A native Windows MCP server correctly routes absolute Windows paths to Rhino",
+    )
     def test_posix_absolute_path_is_never_sent_to_rhino(self, mock_get_conn, tmp_path):
         from rhinoclaw.tools.capture_viewport import capture_viewport
 
@@ -387,7 +392,11 @@ class TestCaptureViewportStorageRouting:
         mock_get_conn.return_value = mock_conn
 
         destination = tmp_path / "capture.png"
-        parsed = json.loads(capture_viewport(MagicMock(), filename=str(destination)))
+        with patch(
+            "rhinoclaw.tools.capture_viewport.get_screenshots_dir",
+            return_value=tmp_path,
+        ):
+            parsed = json.loads(capture_viewport(MagicMock(), filename="capture.png"))
 
         assert parsed["success"] is False
         assert parsed["code"] == "RHINO_ERROR"

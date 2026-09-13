@@ -31,6 +31,7 @@ def _catalog_ok(guid):
         "pass": True,
         "schema_version": 1,
         "global_match": False,
+        "catalog_port_inventory_complete": True,
         "scope": "used_components_only",
         "authoring_search_complete": False,
         "warning": "global proxy catalog drifted; used component is exact",
@@ -41,6 +42,7 @@ def _catalog_ok(guid):
                 "component_count": 2534,
                 "proxy_guid_sha256": "a" * 64,
                 "component_contract_sha256": "b" * 64,
+                "ports_skipped_guids": [],
             },
             "runtime": {
                 "proxy_count": 2643,

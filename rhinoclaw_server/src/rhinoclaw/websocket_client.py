@@ -40,7 +40,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, Deque, Dict, List, Optional
+from typing import Any, Callable, Deque, Dict, List, Optional
 
 from rhinoclaw.config import get_settings
 
@@ -164,6 +164,18 @@ class RhinoWebSocketClient:
             )
             self._connected = True
             logger.info(f"Connected to Rhino WebSocket at {self.url}")
+
+            # A connected transport without a receive loop cannot deliver
+            # request-correlated acknowledgements.  Public usage has always
+            # documented ``connect()`` as sufficient before ``get_state()``,
+            # ``send_input()`` or ``run_script()``; make that contract true.
+            # During an automatic reconnect ``_running`` is already true, so
+            # the existing listener reconnects its own transport instead of
+            # spawning a second consumer for the same socket.
+            if not self._running:
+                self._running = True
+                self._listen_task = asyncio.create_task(self._listen_loop())
+                logger.info("Started listening for WebSocket events")
             return True
 
         except ImportError:
@@ -346,6 +358,108 @@ class RhinoWebSocketClient:
         with self._buffer_lock:
             self._event_buffer.clear()
 
+    async def get_state(
+        self,
+        timeout: float = 5.0,
+    ) -> Optional[Dict[str, Any]]:
+        """Request a correlated, typed Rhino command state.
+
+        The response callback is installed before sending the command so an
+        immediate ``State`` event cannot be lost.
+
+        Args:
+            timeout: Maximum time to wait for the State response.
+
+        Returns:
+            Prompt, command depth, idle flag and stack, or None on failure.
+        """
+        if not self.is_connected:
+            logger.warning("Cannot get state: not connected")
+            return None
+
+        response_event = asyncio.Event()
+        request_id = str(uuid.uuid4())
+        responses: List[Optional[Dict[str, Any]]] = []
+
+        def on_event(event: WebSocketEvent):
+            if (
+                event.event_type != "State"
+                or event.raw.get("request_id") != request_id
+                or responses
+            ):
+                return
+            current_prompt = event.raw.get("current_prompt")
+            in_command = event.raw.get("in_command")
+            command_idle = event.raw.get("command_idle")
+            command_stack = event.raw.get("command_stack")
+            valid = (
+                isinstance(current_prompt, str)
+                and isinstance(in_command, int)
+                and not isinstance(in_command, bool)
+                and in_command >= 0
+                and isinstance(command_idle, bool)
+                and command_idle is (in_command == 0)
+                and isinstance(command_stack, list)
+                and all(isinstance(item, str) for item in command_stack)
+            )
+            responses.append({
+                "current_prompt": current_prompt,
+                "in_command": in_command,
+                "command_idle": command_idle,
+                "command_stack": command_stack,
+            } if valid else None)
+            response_event.set()
+
+        callback_registered = False
+        try:
+            self.add_callback(on_event)
+            callback_registered = True
+            await self._websocket.send(json.dumps({
+                "command": "get_state",
+                "request_id": request_id,
+            }))
+            await asyncio.wait_for(response_event.wait(), timeout=timeout)
+            return responses[0]
+        except asyncio.TimeoutError:
+            logger.warning("Timeout waiting for state response")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get state: {e}")
+            return None
+        finally:
+            if callback_registered:
+                self.remove_callback(on_event)
+
+    async def wait_for_command_idle(
+        self,
+        timeout: float = 10.0,
+        poll_interval: float = 0.05,
+        require_observed_active: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Wait until a correlated state proves ``in_command == 0``.
+
+        When ``require_observed_active`` is true, an initial idle state is
+        ignored until at least one positive command depth was observed. This
+        closes the delayed-command-start race after an asynchronous request.
+        """
+        if timeout <= 0 or poll_interval <= 0:
+            raise ValueError("timeout and poll_interval must be positive")
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        observed_active = not require_observed_active
+        while loop.time() < deadline:
+            remaining = deadline - loop.time()
+            state = await self.get_state(timeout=min(2.0, remaining))
+            if state is not None:
+                if state["in_command"] > 0:
+                    observed_active = True
+                elif observed_active and state["command_idle"] is True:
+                    return state
+            remaining = deadline - loop.time()
+            if remaining > 0:
+                await asyncio.sleep(min(poll_interval, remaining))
+        return None
+
     async def send_input(self, value: str, timeout: float = 5.0) -> bool:
         """
         Send input to the Rhino command line.
@@ -413,8 +527,34 @@ class RhinoWebSocketClient:
             return False
 
         request_id = str(uuid.uuid4())
+        completion_event = asyncio.Event()
+        result = {"success": False}
+
+        expected_events = (
+            {"ScriptCompleted", "ScriptError"}
+            if wait_for_completion
+            else {"ScriptStarted", "ScriptError"}
+        )
+
+        def on_event(event: WebSocketEvent):
+            if (
+                event.event_type in expected_events
+                and event.raw.get("request_id") == request_id
+            ):
+                result["success"] = (
+                    event.event_type != "ScriptError"
+                    and event.raw.get("success", True) is True
+                )
+                completion_event.set()
+
+        callback_registered = False
 
         try:
+            # Register before send: Rhino can acknowledge or complete while
+            # the send coroutine is still yielding control.
+            self.add_callback(on_event)
+            callback_registered = True
+
             # Send the command
             message = json.dumps({
                 "command": "run_script",
@@ -423,34 +563,21 @@ class RhinoWebSocketClient:
             })
             await self._websocket.send(message)
             
-            if not wait_for_completion:
-                return True
-            
-            # Wait for ScriptCompleted event
-            completion_event = asyncio.Event()
-            result = {"success": False}
-            
-            def on_event(event: WebSocketEvent):
-                if event.event_type in ["ScriptCompleted", "ScriptError"]:
-                    if event.raw.get("request_id") == request_id:
-                        result["success"] = event.raw.get("success", False)
-                        completion_event.set()
-            
-            self.add_callback(on_event)
             try:
                 await asyncio.wait_for(completion_event.wait(), timeout=timeout)
                 return result["success"]
             except asyncio.TimeoutError:
                 logger.warning("Timeout waiting for script completion")
                 return False
-            finally:
-                self.remove_callback(on_event)
-                
+
         except Exception as e:
             logger.error(f"Failed to run script: {e}")
             return False
+        finally:
+            if callback_registered:
+                self.remove_callback(on_event)
 
-    async def cancel(self) -> bool:
+    async def cancel(self, timeout: float = 5.0) -> bool:
         """
         Cancel the current Rhino command.
         
@@ -461,13 +588,35 @@ class RhinoWebSocketClient:
             logger.warning("Cannot cancel: not connected")
             return False
 
+        request_id = str(uuid.uuid4())
+        event = asyncio.Event()
+        with self._requests_lock:
+            self._pending_requests[request_id] = event
+
         try:
-            message = json.dumps({"command": "cancel"})
+            message = json.dumps({
+                "command": "cancel",
+                "request_id": request_id,
+            })
             await self._websocket.send(message)
-            return True
+            try:
+                await asyncio.wait_for(event.wait(), timeout=timeout)
+                with self._requests_lock:
+                    response = self._pending_responses.get(request_id, {})
+                return (
+                    response.get("type") == "CancelResult"
+                    and response.get("success") is True
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Timeout waiting for cancel acknowledgment")
+                return False
         except Exception as e:
             logger.error(f"Failed to cancel: {e}")
             return False
+        finally:
+            with self._requests_lock:
+                self._pending_requests.pop(request_id, None)
+                self._pending_responses.pop(request_id, None)
 
     async def wait_for_prompt(
         self,

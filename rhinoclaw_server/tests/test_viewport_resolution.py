@@ -82,7 +82,9 @@ def test_all_native_viewport_consumers_use_one_shared_resolver():
     ).read_text(encoding="utf-8")
     assert '?? "Perspective"' not in consumer_source
     assert "MainViewport.Name ==" not in consumer_source
-    assert "viewport.SetProjection(projection, null, true)" in consumer_source
+    assert "viewport.SetProjection(projection, originalName, true)" in consumer_source
+    assert 'string originalName = viewport.Name;' in consumer_source
+    assert '"viewport_name_preserved"' in consumer_source
     assert "DefinedViewportProjection.Top" in consumer_source
     assert "DefinedViewportProjection.TwoPointPerspective" in consumer_source
     assert "KeyboardRotate(leftRight, angleRadians)" in consumer_source

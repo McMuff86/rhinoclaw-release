@@ -22,6 +22,7 @@ def _verification(*, global_match=True, pass_value=True):
         "pass": pass_value,
         "schema_version": 1,
         "global_match": global_match,
+        "catalog_port_inventory_complete": True,
         "scope": "full_catalog" if global_match else "used_components_only",
         "authoring_search_complete": global_match,
         "warning": None if global_match else "installed proxy catalog drifted",
@@ -34,6 +35,7 @@ def _verification(*, global_match=True, pass_value=True):
                     "a" * 64 if global_match else "b" * 64
                 ),
                 "component_contract_sha256": "c" * 64,
+                "ports_skipped_guids": [],
             },
             "runtime": {
                 "proxy_count": 2643,
@@ -74,6 +76,27 @@ def test_python_accepts_explicit_used_component_scope_on_global_drift():
     assert accepted["scope"] == "used_components_only"
     assert accepted["authoring_search_complete"] is False
     assert accepted["warning"]
+
+
+def test_python_accepts_used_scope_when_catalog_has_skipped_ports():
+    verification = _verification(global_match=True)
+    verification["catalog_port_inventory_complete"] = False
+    verification["scope"] = "used_components_only"
+    verification["authoring_search_complete"] = False
+    verification["warning"] = "two proxies have skipped port introspection"
+    verification["evidence"]["contract"]["ports_skipped_guids"] = [
+        "11111111-1111-4111-8111-111111111111"
+    ]
+
+    accepted = require_catalog_verification({
+        "status": "success",
+        "catalog_verification": verification,
+    })
+
+    assert accepted["global_match"] is True
+    assert accepted["catalog_port_inventory_complete"] is False
+    assert accepted["scope"] == "used_components_only"
+    assert accepted["authoring_search_complete"] is False
 
 
 def test_python_rejects_used_component_mismatch():
@@ -127,6 +150,10 @@ def test_csharp_gate_hashes_live_proxies_and_compares_exact_ports():
     source = SERVICE.read_text(encoding="utf-8")
 
     assert "Instances.ComponentServer?.ObjectProxies?.ToList()" in source
+    assert ".Select(proxy => StableProxyGuid(proxy)" in source
+    assert ".GroupBy(StableProxyGuid)" in source
+    assert "proxy.LibraryGuid != Guid.Empty" in source
+    assert '"Grasshopper.Kernel.GH_UserObjectProxy"' in source
     assert '.ToString("D").ToLowerInvariant()' in source
     assert ".OrderBy(value => value, StringComparer.Ordinal)" in source
     assert 'Encoding.UTF8.GetBytes(string.Join("\\n", values))' in source

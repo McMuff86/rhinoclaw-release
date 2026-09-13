@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Regenerate ``static/gh_components.json`` from a live scratch Rhino.
 
-Run from ``rhinoclaw_server/`` only after opening an isolated Rhino document:
+Run from ``rhinoclaw_server/`` on Windows or WSL only after opening an
+isolated Rhino document:
 
     RHINOCLAW_HOST=<host> uv run python scripts/generate_gh_catalog.py
 
@@ -21,17 +22,36 @@ import argparse
 from datetime import datetime, timezone
 import json
 import os
+import platform
 from pathlib import Path
 import subprocess
 import tempfile
-import time
 from typing import Any, Dict, Iterable, List, Tuple
 
 from rhinoclaw.server import get_rhino_connection
 from rhinoclaw.utils.gh_catalog import catalog_contract
 
 
-DEFAULT_WORK_DIR = Path("/mnt/c/Temp/rhinoclaw-gh-catalog")
+
+def _is_wsl() -> bool:
+    """Return whether this Python process is running inside WSL."""
+    return (
+        os.name == "posix"
+        and (
+            bool(os.environ.get("WSL_INTEROP"))
+            or "microsoft" in platform.release().lower()
+        )
+    )
+
+
+def _default_work_dir() -> Path:
+    """Choose scratch storage that the connected Rhino process can read."""
+    if _is_wsl():
+        return Path("/mnt/c/Temp/rhinoclaw-gh-catalog")
+    return Path(tempfile.gettempdir()) / "rhinoclaw-gh-catalog"
+
+
+DEFAULT_WORK_DIR = _default_work_dir()
 DEFAULT_OUTPUT = (
     Path(__file__).resolve().parents[1]
     / "src"
@@ -43,9 +63,27 @@ DEFAULT_OUTPUT = (
 _PROBE_CODE = r"""
 import Grasshopper
 import Rhino
+import hashlib
 import json
+
+def proxy_identity(proxy):
+    runtime_guid = str(proxy.Guid).lower()
+    try:
+        if proxy.GetType().FullName == 'Grasshopper.Kernel.GH_UserObjectProxy':
+            library_guid = str(proxy.LibraryGuid).lower()
+            if library_guid and library_guid != '00000000-0000-0000-0000-000000000000':
+                return library_guid
+    except BaseException:
+        pass
+    return runtime_guid
+
+proxy_guids = sorted(
+    proxy_identity(proxy)
+    for proxy in Grasshopper.Instances.ComponentServer.ObjectProxies)
 print('CATALOG_META:' + json.dumps({
-    'proxy_count': len(list(Grasshopper.Instances.ComponentServer.ObjectProxies)),
+    'proxy_count': len(proxy_guids),
+    'proxy_guid_sha256': hashlib.sha256(
+        '\n'.join(proxy_guids).encode('utf-8')).hexdigest(),
     'rhino_version': str(Rhino.RhinoApp.Version),
 }, sort_keys=True))
 """
@@ -54,18 +92,41 @@ _CHUNK_CODE = r"""
 import codecs
 import clr
 import Grasshopper
+import hashlib
 import json
 clr.AddReference('Newtonsoft.Json')
+clr.AddReference('System')
 from Newtonsoft.Json import JsonConvert
+from System.Diagnostics import FileVersionInfo
 
 server = Grasshopper.Instances.ComponentServer
 proxies = list(server.ObjectProxies)
 start = __START__
-end = min(start + __CHUNK__, len(proxies))
+expected_proxy_hash = __EXPECTED_PROXY_HASH__
+
+def proxy_identity(proxy):
+    runtime_guid = str(proxy.Guid).lower()
+    try:
+        if proxy.GetType().FullName == 'Grasshopper.Kernel.GH_UserObjectProxy':
+            library_guid = str(proxy.LibraryGuid).lower()
+            if library_guid and library_guid != '00000000-0000-0000-0000-000000000000':
+                return library_guid
+    except BaseException:
+        pass
+    return runtime_guid
+
+def proxy_guid_hash(items):
+    guids = sorted(proxy_identity(proxy) for proxy in items)
+    return hashlib.sha256('\n'.join(guids).encode('utf-8')).hexdigest()
+
+initial_proxy_hash = proxy_guid_hash(proxies)
+catalog_changed = initial_proxy_hash != expected_proxy_hash
+end = start if catalog_changed else min(start + __CHUNK__, len(proxies))
 skip = set(__SKIP__)
 out_path = __OUT__
 marker_path = __MARKER__
 errors = 0
+assembly_cache = {}
 
 def ports(plist):
     result = []
@@ -75,6 +136,9 @@ def ports(plist):
                 'n': param.Name,
                 'nn': param.NickName,
                 't': param.TypeName,
+                'access': str(param.Access).lower(),
+                'optional': bool(param.Optional),
+                'runtime_type': param.GetType().FullName,
             })
         except BaseException:
             result.append({'n': '?', 'nn': '?', 't': '?'})
@@ -87,6 +151,41 @@ def text_attr(source, name, default=''):
     except BaseException:
         return default
 
+def guid_attr(source, name):
+    try:
+        return str(getattr(source, name)).lower()
+    except BaseException:
+        return ''
+
+def instance_metadata(instance):
+    runtime_type = instance.GetType()
+    assembly = runtime_type.Assembly
+    assembly_name = assembly.GetName()
+    location = ''
+    try:
+        location = assembly.Location or ''
+    except BaseException:
+        pass
+    cache_key = location or str(assembly.FullName)
+    if cache_key not in assembly_cache:
+        metadata = {
+            'name': str(assembly_name.Name),
+            'version': str(assembly_name.Version),
+            'location': location,
+        }
+        if location:
+            try:
+                version_info = FileVersionInfo.GetVersionInfo(location)
+                metadata['file_version'] = version_info.FileVersion or ''
+                metadata['product_version'] = version_info.ProductVersion or ''
+            except BaseException:
+                pass
+        assembly_cache[cache_key] = metadata
+    return {
+        'runtime_type': runtime_type.FullName,
+        'assembly': assembly_cache[cache_key],
+    }
+
 out_file = codecs.open(out_path, 'a', encoding='utf-8')
 marker_file = codecs.open(marker_path, 'w', encoding='utf-8')
 try:
@@ -95,8 +194,13 @@ try:
         guid_text = ''
         entry = {'proxy_index': index}
         try:
-            guid_text = str(proxy.Guid).lower()
+            runtime_guid = str(proxy.Guid).lower()
+            guid_text = proxy_identity(proxy)
             entry['guid'] = guid_text
+            entry['proxy_type'] = proxy.GetType().FullName
+            if runtime_guid != guid_text:
+                entry['runtime_guid'] = runtime_guid
+                entry['guid_source'] = 'library_guid'
         except BaseException as exc:
             entry['guid'] = ''
             entry['proxy_error'] = (
@@ -131,6 +235,10 @@ try:
             entry['obsolete_read_error'] = type(exc).__name__
             errors += 1
 
+        entry['library_guid'] = guid_attr(proxy, 'LibraryGuid')
+        entry['location'] = text_attr(proxy, 'Location')
+        entry['exposure'] = str(text_attr(proxy, 'Exposure')).lower()
+
         if not guid_text:
             entry['instantiate_error'] = 'proxy Guid unavailable'
         elif guid_text in skip:
@@ -152,6 +260,7 @@ try:
                 else:
                     entry['instantiated'] = True
                     try:
+                        entry.update(instance_metadata(instance))
                         if hasattr(instance, 'Params'):
                             entry['in'] = ports(instance.Params.Input)
                             entry['out'] = ports(instance.Params.Output)
@@ -197,6 +306,9 @@ print('CATALOG_CHUNK:' + json.dumps({
     'end': end,
     'total': len(proxies),
     'errors': errors,
+    'initial_proxy_guid_sha256': initial_proxy_hash,
+    'final_proxy_guid_sha256': proxy_guid_hash(list(server.ObjectProxies)),
+    'catalog_changed': catalog_changed,
 }, sort_keys=True))
 """
 
@@ -238,7 +350,11 @@ def _pending_marker_guid(marker_path: Path, written_count: int) -> str | None:
     return parts[1].lower() if marker_index >= written_count else None
 
 
-def _windows_path(path: Path) -> str:
+def _rhino_path(path: Path, *, is_wsl: bool | None = None) -> str:
+    """Resolve a host path into the path syntax understood by Rhino."""
+    use_wsl = _is_wsl() if is_wsl is None else is_wsl
+    if not use_wsl:
+        return str(path.resolve())
     completed = subprocess.run(
         ["wslpath", "-w", str(path.resolve())],
         check=True,
@@ -258,6 +374,7 @@ def _render_chunk_code(
     skipped_guids: Iterable[str],
     windows_jsonl: str,
     windows_marker: str,
+    expected_proxy_hash: str,
 ) -> str:
     return (
         _CHUNK_CODE.replace("__START__", str(start))
@@ -265,6 +382,7 @@ def _render_chunk_code(
         .replace("__SKIP__", json.dumps(sorted(set(skipped_guids))))
         .replace("__OUT__", json.dumps(windows_jsonl))
         .replace("__MARKER__", json.dumps(windows_marker))
+        .replace("__EXPECTED_PROXY_HASH__", json.dumps(expected_proxy_hash))
     )
 
 
@@ -287,6 +405,7 @@ def _assemble_catalog(
     *,
     rhino_version: str,
     expected_count: int,
+    expected_proxy_hash: str,
 ) -> Dict[str, Any]:
     entries = _load_jsonl(jsonl_path)
     if len(entries) != expected_count:
@@ -311,6 +430,7 @@ def _assemble_catalog(
         entry["guid"] for entry in components if entry.get("ports_skipped")
     )
     meta: Dict[str, Any] = {
+        "catalog_metadata_schema": 2,
         "component_count": len(components),
         "generated": datetime.now(timezone.utc).date().isoformat(),
         "rhino_version": rhino_version,
@@ -326,6 +446,11 @@ def _assemble_catalog(
     }
     catalog = {"meta": meta, "components": components}
     contract = catalog_contract(catalog)
+    if contract["proxy_guid_sha256"] != expected_proxy_hash:
+        raise ValueError(
+            "catalog JSONL stable proxy GUID hash differs from the live runtime; "
+            "run again with --reset after Grasshopper plug-ins finish loading"
+        )
     meta.update({
         "catalog_contract_schema": contract["schema_version"],
         "proxy_guid_sha256": contract["proxy_guid_sha256"],
@@ -345,7 +470,14 @@ def _assemble_catalog(
             delete=False,
         ) as stream:
             temp_name = stream.name
-            json.dump(catalog, stream, ensure_ascii=False, indent=2)
+            # Keep the generated catalog reviewable as one deterministic
+            # artifact instead of creating a six-figure line-only diff.
+            json.dump(
+                catalog,
+                stream,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
@@ -357,7 +489,7 @@ def _assemble_catalog(
     return catalog
 
 
-def _probe_runtime(rhino: Any) -> Tuple[int, str]:
+def _probe_runtime(rhino: Any) -> Tuple[int, str, str]:
     raw = rhino.send_command(
         "execute_rhinoscript_python_code",
         {"code": _PROBE_CODE},
@@ -366,22 +498,27 @@ def _probe_runtime(rhino: Any) -> Tuple[int, str]:
     meta = _tagged_json(_result_text(raw), "CATALOG_META:")
     count = meta.get("proxy_count")
     version = str(meta.get("rhino_version") or "")
+    proxy_hash = str(meta.get("proxy_guid_sha256") or "")
     if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
         raise ValueError(f"invalid live proxy count: {count!r}")
     if not version:
         raise ValueError("live Rhino version was empty")
-    return count, version
+    if len(proxy_hash) != 64:
+        raise ValueError("live proxy GUID hash was invalid")
+    return count, version, proxy_hash
 
 
-def _wait_for_rhino(rhino: Any) -> None:
-    for _ in range(24):
-        time.sleep(5)
-        try:
-            rhino.send_command("ping", {}, timeout=5)
-            return
-        except Exception:
+def _known_skipped_guids(*paths: Path) -> set:
+    """Preserve published hang exclusions even on a fresh/reset sweep."""
+    skipped = set()
+    for path in set(paths):
+        if not path.exists():
             continue
-    raise TimeoutError("Rhino did not recover after a hung proxy")
+        catalog = json.loads(path.read_text(encoding="utf-8"))
+        skipped.update(catalog_contract(catalog)["ports_skipped_guids"])
+        skipped.update(str(entry["guid"]).lower() for entry in catalog["components"]
+                       if "ports_skipped" in entry and entry.get("guid"))
+    return skipped
 
 
 def _arguments() -> argparse.Namespace:
@@ -391,7 +528,7 @@ def _arguments() -> argparse.Namespace:
         type=Path,
         default=Path(os.environ.get(
             "RHINOCLAW_GH_CATALOG_WORK_DIR", DEFAULT_WORK_DIR)),
-        help="WSL-visible scratch directory shared with Windows Rhino",
+        help="scratch directory shared with the connected Rhino process",
     )
     parser.add_argument(
         "--output",
@@ -421,10 +558,10 @@ def main() -> int:
         jsonl_path.unlink(missing_ok=True)
         marker_path.unlink(missing_ok=True)
 
-    windows_jsonl = _windows_path(jsonl_path)
-    windows_marker = _windows_path(marker_path)
+    rhino_jsonl = _rhino_path(jsonl_path)
+    rhino_marker = _rhino_path(marker_path)
     rhino = get_rhino_connection()
-    expected_count, rhino_version = _probe_runtime(rhino)
+    expected_count, rhino_version, expected_proxy_hash = _probe_runtime(rhino)
 
     start = _line_count(jsonl_path)
     if start > expected_count:
@@ -432,7 +569,7 @@ def main() -> int:
             f"resume JSONL has {start} lines but runtime has only "
             f"{expected_count} proxies; run again with --reset"
         )
-    skipped_guids = set()
+    skipped_guids = _known_skipped_guids(DEFAULT_OUTPUT, args.output.resolve())
     pending = _pending_marker_guid(marker_path, start)
     if pending:
         skipped_guids.add(pending)
@@ -446,8 +583,9 @@ def main() -> int:
             start=start,
             chunk=args.chunk,
             skipped_guids=skipped_guids,
-            windows_jsonl=windows_jsonl,
-            windows_marker=windows_marker,
+            windows_jsonl=rhino_jsonl,
+            windows_marker=rhino_marker,
+            expected_proxy_hash=expected_proxy_hash,
         )
         try:
             raw = rhino.send_command(
@@ -463,17 +601,29 @@ def main() -> int:
                     "catalog chunk failed without a pending proxy marker"
                 )
             skipped_guids.add(pending)
-            print(f"[WARN] hung proxy {pending}; waiting for Rhino recovery")
-            _wait_for_rhino(rhino)
-            start = _line_count(jsonl_path)
-            continue
+            # A timeout does not establish that CreateInstance stopped. Do not
+            # restart/replay a sweep behind a possibly blocked Rhino UI.
+            from rhinoclaw.tools.get_ui_state import get_ui_state
+            print("[WARN] UI state after failed chunk: " + get_ui_state(None, timeout=5))
+            raise RuntimeError(
+                f"Proxy {pending} did not finish. Inspect Rhino, end the blocked call, "
+                "then rerun without --reset; the marker excludes this proxy. No automatic replay."
+            )
 
         live_total = status.get("total")
         end = status.get("end")
-        if live_total != expected_count or not isinstance(end, int):
+        initial_hash = status.get("initial_proxy_guid_sha256")
+        final_hash = status.get("final_proxy_guid_sha256")
+        if (
+            live_total != expected_count
+            or not isinstance(end, int)
+            or initial_hash != expected_proxy_hash
+            or final_hash != expected_proxy_hash
+            or status.get("catalog_changed") is True
+        ):
             raise RuntimeError(
-                "ComponentServer changed during generation; discard the "
-                "scratch JSONL and regenerate"
+                "ComponentServer GUID set changed during generation; rerun "
+                "with --reset after Grasshopper plug-ins finish loading"
             )
         new_start = _line_count(jsonl_path)
         if new_start != end or new_start <= start:
@@ -492,6 +642,7 @@ def main() -> int:
         args.output.resolve(),
         rhino_version=rhino_version,
         expected_count=expected_count,
+        expected_proxy_hash=expected_proxy_hash,
     )
     meta = catalog["meta"]
     print(

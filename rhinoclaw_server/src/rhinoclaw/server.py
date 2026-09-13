@@ -146,6 +146,13 @@ class RhinoConnection:
         logger.info(f"Received complete response ({len(data)} bytes)")
         return data
 
+    # Extra slack on the socket-recv deadline beyond the command timeout we
+    # hand the plugin: the plugin writes a structured TIMEOUT error frame at
+    # exactly `timeout`, and without the grace our recv deadline would expire
+    # in a race with that frame — turning a diagnosable plugin-side timeout
+    # into an anonymous "no data received".
+    _PLUGIN_REPLY_GRACE_SECONDS = 5.0
+
     def _execute_command(self, command_type: str, params: Dict[str, Any], timeout: float = 15.0,
                          idempotency_key: Optional[str] = None) -> Dict[str, Any]:
         """Internal method to execute a command (no retry logic).
@@ -165,6 +172,10 @@ class RhinoConnection:
             request_id=request_id,
             idempotency_key=idempotency_key,
             auth_token=settings.auth_token,
+            # Sizes the plugin's UI-thread wait (clamped to [1, 300] there).
+            # Without this the plugin always waited its 60 s default, so a
+            # tool-level timeout above 60 s was silently unreachable.
+            timeout=timeout,
         )
 
         log_extra = {"request_id": request_id, "tool": command_type}
@@ -189,7 +200,8 @@ class RhinoConnection:
             if _debug_mode:
                 logger.debug(f"Command JSON sent: {command_bytes.decode('utf-8')}")
 
-            response_data = self.receive_full_response(self.sock, timeout=timeout)
+            response_data = self.receive_full_response(
+                self.sock, timeout=timeout + self._PLUGIN_REPLY_GRACE_SECONDS)
         if _debug_mode:
             logger.debug(f"Received raw response: {response_data.decode('utf-8')}")
 

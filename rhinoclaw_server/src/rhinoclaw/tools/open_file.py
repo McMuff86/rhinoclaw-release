@@ -19,14 +19,16 @@ def open_file(
     - file_path: Full path to the .3dm file to open
     
     Returns:
-        {"ok": true, "message": "Opened file", "data": {"file_path": "C:/path/to/file.3dm"}}
+        {"success": true, "message": "Opened file", "data": {"file_path": "C:/path/to/file.3dm"}}
     
     Notes:
     - Opens the file in the current Rhino instance
-    - Any unsaved changes in the current document will be lost
-    - Use save_file first if you need to preserve current work
+    - Refuses to replace a document with unsaved changes or an active undo record
+    - Uses native open and verifies the active path, object IDs and units against the archive
+    - Reports an already-open document separately from a reload from disk
+    - Document opening is not reversible through Rhino Undo
     """
-    if not file_path:
+    if not file_path or not file_path.strip():
         return json.dumps(from_exception(
             ValueError("file_path is required"),
             code=ErrorCode.INVALID_PARAMS
@@ -45,8 +47,13 @@ def open_file(
             "file_path": file_path
         })
         
+        if result.get("success") is False:
+            response = from_exception(RuntimeError(result.get("message", "Open verification failed")),
+                                      code=result.get("error_code", ErrorCode.RHINO_ERROR))
+            response["data"] = result
+            return json.dumps(response)
         return json.dumps(ok(
-            message=f"Opened file: {file_path}",
+            message=result.get("message", f"Opened file: {file_path}"),
             data=result
         ))
     except Exception as e:

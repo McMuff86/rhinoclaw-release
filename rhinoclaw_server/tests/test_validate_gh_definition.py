@@ -177,3 +177,37 @@ def test_instantiate_failure_and_missing_proof_are_not_authorable():
     assert any(
         "instantiation_unverified" in error for error in result["errors"]
     )
+
+
+def test_curve_parameter_accepts_only_a_nonempty_rhino_reference_guid():
+    from rhinoclaw.tools.find_gh_component import _catalog
+
+    curve = {
+        "type": "sdk_component",
+        "name": "Footprint",
+        "guid": "d5967b9f-e8ee-436b-a8ad-29fdcecf32d5",
+        "reference_object_id": "11111111-2222-3333-4444-555555555555",
+    }
+    assert lint_definition([curve], [], catalog=_catalog())["valid"] is True
+
+    curve["reference_object_id"] = "00000000-0000-0000-0000-000000000000"
+    invalid = lint_definition([curve], [], catalog=_catalog())
+    assert invalid["valid"] is False
+    assert any("non-empty GUID" in error for error in invalid["errors"])
+
+
+def test_reference_object_id_is_rejected_for_non_curve_sdk_component():
+    from rhinoclaw.tools.find_gh_component import _catalog
+
+    result = lint_definition(
+        [{
+            "type": "sdk_component",
+            "name": "Box",
+            "guid": "28061aae-04fb-4cb5-ac45-16f3b66bc0a4",
+            "reference_object_id": "11111111-2222-3333-4444-555555555555",
+        }],
+        [],
+        catalog=_catalog(),
+    )
+    assert result["valid"] is False
+    assert any("standalone Curve" in error for error in result["errors"])

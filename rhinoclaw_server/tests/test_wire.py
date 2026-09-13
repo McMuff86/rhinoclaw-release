@@ -64,6 +64,16 @@ def test_build_command_omits_ids_when_not_given():
     assert "idempotency_key" not in cmd
 
 
+def test_build_command_attaches_timeout_when_given():
+    # Sizes the plugin's UI-thread wait; without it the plugin always used
+    # its 60 s default and tool-level timeouts above that were unreachable.
+    assert wire.build_command("ping", timeout=120.0)["timeout"] == 120.0
+
+
+def test_build_command_omits_timeout_when_not_given():
+    assert "timeout" not in wire.build_command("ping")
+
+
 def test_encode_command_roundtrips_json():
     cmd = wire.build_command("ping", {"n": 1}, request_id="r")
     assert json.loads(wire.encode_command(cmd).decode("utf-8")) == cmd

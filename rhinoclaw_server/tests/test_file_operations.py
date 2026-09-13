@@ -60,7 +60,8 @@ class TestSaveFile:
         mock_rhino = MagicMock()
         mock_rhino.send_command.return_value = {
             "file_path": "C:/test/model.3dm",
-            "status": "saved"
+            "status": "saved",
+            "verification": {"pass": True}
         }
         
         with patch("rhinoclaw.tools.save_file.get_rhino_connection", return_value=mock_rhino):
@@ -78,7 +79,8 @@ class TestSaveFile:
         mock_rhino = MagicMock()
         mock_rhino.send_command.return_value = {
             "file_path": "C:/existing/document.3dm",
-            "status": "saved"
+            "status": "saved",
+            "verification": {"pass": True}
         }
         
         with patch("rhinoclaw.tools.save_file.get_rhino_connection", return_value=mock_rhino):
@@ -86,7 +88,42 @@ class TestSaveFile:
         
         result_data = json.loads(result)
         assert result_data["success"] is True
-        mock_rhino.send_command.assert_called_once_with("save_file", {})
+        mock_rhino.send_command.assert_called_once_with("save_file", {}, timeout=120.0)
+
+    @pytest.mark.parametrize("path", ["", "   ", "model.obj"])
+    def test_invalid_save_path_never_connects(self, path):
+        from rhinoclaw.tools.save_file import save_file
+
+        with patch("rhinoclaw.tools.save_file.get_rhino_connection") as connect:
+            result = json.loads(save_file(MagicMock(), path))
+        assert result["success"] is False
+        connect.assert_not_called()
+
+    @pytest.mark.parametrize("verification", [None, {}, {"pass": False}, {"pass": "true"}])
+    def test_unverified_save_preserves_partial_outcome(self, verification):
+        from rhinoclaw.tools.save_file import save_file
+
+        raw = {"file_path": "C:/Villa.3dm", "status": "saved_unverified",
+               "write_reported_success": True, "verification": verification}
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = raw
+        with patch("rhinoclaw.tools.save_file.get_rhino_connection", return_value=mock_rhino):
+            result = json.loads(save_file(MagicMock(), "C:/Villa.3dm"))
+        assert result["success"] is False
+        assert result["data"] == raw
+
+    def test_unicode_and_spaces_are_passed_as_path_data(self):
+        from rhinoclaw.tools.save_file import save_file
+
+        path = "C:/Entwürfe/Villa Süd.3dm"
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {
+            "status": "saved", "file_path": path, "verification": {"pass": True}
+        }
+        with patch("rhinoclaw.tools.save_file.get_rhino_connection", return_value=mock_rhino):
+            result = json.loads(save_file(MagicMock(), path))
+        assert result["success"] is True
+        mock_rhino.send_command.assert_called_once_with("save_file", {"file_path": path}, timeout=120.0)
 
     def test_save_file_wrong_extension(self):
         """Test save with non-.3dm path fails."""

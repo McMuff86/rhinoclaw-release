@@ -7964,15 +7964,22 @@ def va_list_objects(
     ctx: Context,
     kind: VisualArqObjectKind = "wall",
     limit: int = 200,
+    layer_prefix: Optional[str] = None,
 ) -> str:
     """List document-resident VisualARQ products with measured metadata.
 
     ``kind`` defaults to ``wall`` for an inexpensive focused query. Use
     ``all`` deliberately to classify every VisualARQ product. Results include
-    canonical object/style IDs, geometry validity/BBox and lightweight
-    kind-specific readback. Expensive volume and wall-layer detail are omitted;
-    call ``va_get_object`` for the full measured snapshot. ``matched_count``
-    remains truthful when the returned list is truncated by ``limit``.
+    canonical object/style IDs, the object's full layer path, geometry
+    validity/BBox and lightweight kind-specific readback. Expensive volume
+    and wall-layer detail are omitted; call ``va_get_object`` for the full
+    measured snapshot. ``matched_count`` remains truthful when the returned
+    list is truncated by ``limit``.
+
+    ``layer_prefix`` restricts the scan to objects whose full layer path
+    starts with the given text (e.g. ``"Plot9::"``). The filter runs before
+    any VisualARQ classification, so scoping to one plot never pays the cost
+    of classifying the whole document.
     """
     try:
         if kind not in _VA_OBJECT_KINDS:
@@ -7981,18 +7988,33 @@ def va_list_objects(
             )
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 5000:
             raise ValueError("limit must be an integer between 1 and 5000")
+        if layer_prefix is not None and (
+            not isinstance(layer_prefix, str)
+            or not layer_prefix.strip()
+            or len(layer_prefix) > 500
+        ):
+            raise ValueError(
+                "layer_prefix must be a non-empty string of at most 500 "
+                "characters"
+            )
         rhino = get_rhino_connection()
         result = run_va(
             rhino,
             _STYLE_SCRIPT_HELPERS + _OBJECT_SCRIPT_HELPERS + r"""
 import scriptcontext as sc
 requested_kind = params["kind"]
+layer_prefix = params.get("layer_prefix")
 matched_count = 0
 objects = []
 scan_errors = []
 scan_error_count = 0
 style_cache = {}
 for obj in sc.doc.Objects:
+    obj_layer = sc.doc.Layers.FindIndex(obj.Attributes.LayerIndex)
+    obj_layer_path = obj_layer.FullPath if obj_layer is not None else None
+    if layer_prefix is not None:
+        if obj_layer_path is None or not obj_layer_path.startswith(layer_prefix):
+            continue
     if requested_kind == "all":
         # Avoid all classifiers for plain Rhino objects in large documents.
         identity_probe = va_visualarq_identity_probe(obj.Id)
@@ -8052,6 +8074,7 @@ for obj in sc.doc.Objects:
         snapshot = va_product_snapshot(
             obj, classification_probe, False, False, style_cache)
         if snapshot is not None:
+            snapshot["layer"] = obj_layer_path
             objects.append(snapshot)
             if snapshot.get("readback_complete") is not True:
                 scan_error_count += 1
@@ -8063,6 +8086,7 @@ for obj in sc.doc.Objects:
                     })
 result = {
     "status": "success", "kind": requested_kind,
+    "layer_prefix": layer_prefix,
     "objects": objects, "matched_count": matched_count,
     "returned_count": len(objects),
     "truncated": matched_count > len(objects),
@@ -8072,7 +8096,7 @@ result = {
     "scan_errors_truncated": scan_error_count > len(scan_errors),
 }
 """,
-            {"kind": kind, "limit": limit},
+            {"kind": kind, "limit": limit, "layer_prefix": layer_prefix},
         )
         return _respond(
             result,
@@ -8295,8 +8319,9 @@ def va_create_wall(
     failed creation judge deletes the new wall and returns
     `VERIFICATION_FAILED` rather than leaving dubious BIM.
 
+    Prefer this tool over Rhino boxes/extrusions for architectural BIM walls.
     Doors/windows are inserted into the wall afterwards via
-    `va_create_door` with this `wall_id`.
+    `va_create_door` / `va_create_window` with this `wall_id`.
     """
     try:
         _require_name(style, "style")

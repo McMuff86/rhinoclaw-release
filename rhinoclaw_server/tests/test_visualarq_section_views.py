@@ -226,7 +226,7 @@ def test_installed_catalog_freezes_section_view_component_contracts():
         ROOT / "rhinoclaw_server" / "src" / "rhinoclaw" / "static" /
         "gh_components.json"
     )
-    catalog = json.loads(catalog_path.read_text())
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     by_guid = {item["guid"]: item for item in catalog["components"]}
 
     options = by_guid["56d3f889-2a72-4c7f-ad5b-8d68ef70fb88"]

@@ -24,6 +24,28 @@ def test_catalog_structure_gate():
     sample = components[0]
     for key in ("guid", "name", "cat"):
         assert key in sample
+    assert catalog["meta"]["catalog_metadata_schema"] == 2
+    visualarq = next(
+        component for component in components
+        if component.get("cat") == "VisualARQ" and component.get("in")
+    )
+    for key in (
+        "library_guid", "location", "exposure", "runtime_type", "assembly",
+    ):
+        assert key in visualarq
+    assert visualarq["assembly"]["name"]
+    assert visualarq["assembly"]["file_version"]
+    for key in ("access", "optional", "runtime_type"):
+        assert key in visualarq["in"][0]
+    user_object = next(
+        component for component in components
+        if component.get("guid_source") == "library_guid"
+    )
+    assert user_object["proxy_type"] == (
+        "Grasshopper.Kernel.GH_UserObjectProxy"
+    )
+    assert user_object["guid"] == user_object["library_guid"]
+    assert user_object["runtime_guid"] != user_object["guid"]
 
 
 def test_catalog_contract_is_deterministic_and_runtime_checkable():
@@ -42,6 +64,9 @@ def test_catalog_contract_is_deterministic_and_runtime_checkable():
     assert first["component_count"] == len(catalog["components"])
     assert len(first["proxy_guid_sha256"]) == 64
     assert len(first["component_contract_sha256"]) == 64
+    assert first["ports_skipped_guids"] == sorted(
+        catalog["meta"]["ports_skipped_guids"]
+    )
     assert first["used_components"] == []
 
 

@@ -8,8 +8,10 @@ in milliseconds instead of after an author→solve→bake round-trip.
 Pure Python, no Rhino. Reused by `validate_gh_definition` (tool) and the
 future interactive author loop (NEXT-LEVEL 5.3).
 """
+import math
 import re
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from rhinoclaw.utils.gh_catalog import catalog_entry_with_authorability
 
@@ -125,6 +127,23 @@ def lint_definition(
                         f"component '{label}': '{entry.get('name')}' is "
                         "flagged OBSOLETE — prefer the current version")
 
+                reference_object_id = comp.get("reference_object_id")
+                if reference_object_id is not None:
+                    if entry.get("param_type") != "Curve":
+                        errors.append(
+                            f"component '{label}': reference_object_id is "
+                            "supported only for a standalone Curve parameter"
+                        )
+                    try:
+                        parsed_reference = UUID(str(reference_object_id))
+                        if parsed_reference.int == 0:
+                            raise ValueError("Guid.Empty")
+                    except (TypeError, ValueError, AttributeError):
+                        errors.append(
+                            f"component '{label}': reference_object_id must "
+                            "be a non-empty GUID"
+                        )
+
         if ctype in _SCRIPT_TYPES:
             for out in comp.get("extra_outputs") or []:
                 if "RH_OUT" in str(out):
@@ -144,7 +163,18 @@ def lint_definition(
 
         if ctype == "slider":
             default = comp.get("default")
-            lo, hi = comp.get("min"), comp.get("max")
+            lo, hi = comp.get("min", 0), comp.get("max", 100)
+            if not all(isinstance(v, (float, int)) and not isinstance(v, bool) and math.isfinite(v)
+                       for v in (lo, hi)) or lo >= hi:
+                errors.append(f"slider '{label}': finite min < max required; use a Panel for a constant")
+                continue
+            decimals = comp.get("decimals", 1)
+            if not isinstance(decimals, int) or isinstance(decimals, bool) or not 0 <= decimals <= 12:
+                errors.append(f"slider '{label}': decimals must be an integer from 0 to 12")
+            if default is not None and (not isinstance(default, (int, float)) or isinstance(default, bool)
+                                        or not math.isfinite(default)):
+                errors.append(f"slider '{label}': default must be a finite number")
+                continue
             if default is not None and lo is not None and hi is not None \
                     and not (lo <= default <= hi):
                 warnings.append(

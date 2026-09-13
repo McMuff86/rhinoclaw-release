@@ -106,12 +106,15 @@ class FakeRhino:
     """Scripted plugin connection: dispatches send_command by content."""
 
     def __init__(self, prompts, before_ids, after_ids, bboxes,
-                 file_exists=True):
+                 file_exists=True, send_keystrokes_supported=True):
         self.prompts = iter(prompts)
         self.ids = iter([before_ids, after_ids])
         self.bboxes = bboxes
         self.file_exists = file_exists
+        self.send_keystrokes_supported = send_keystrokes_supported
+        self.started_scripts = []
         self.sent_inputs = []
+        self.legacy_inputs = []
         self.rotated = []
         self.grouped = []
         self.layered = []
@@ -124,6 +127,16 @@ class FakeRhino:
             ]}
         if command == "unload_grasshopper_definition":
             return {}
+        if command == "start_script_async":
+            self.started_scripts.append(params["script"])
+            return {"status": "started", "script": params["script"]}
+        if command == "send_keystrokes":
+            if not self.send_keystrokes_supported:
+                from rhinoclaw.utils.errors import ErrorCode, RhinoCommandError
+                raise RhinoCommandError("Unknown command type: send_keystrokes",
+                                        error_code=ErrorCode.UNKNOWN_COMMAND)
+            self.sent_inputs.append(params["text"])
+            return {"sent": params["text"], "enter": True}
         if command == "get_command_history":
             return {"command_prompt": next(self.prompts, "Command")}
         if command == "get_objects_info":
@@ -148,7 +161,7 @@ class FakeRhino:
                 self.layered.append(code)
                 return PRINT + "2"
             if "SendKeystrokes" in code:
-                self.sent_inputs.append(code)
+                self.legacy_inputs.append(code)
                 return PRINT
         raise AssertionError(f"unexpected command {command}")
 
@@ -187,6 +200,53 @@ def test_runner_diffs_guids_postprocesses_and_reads_real_bbox():
     fed = " ".join(rhino.sent_inputs)
     assert "900" in fed
     assert "1000,500,0" in fed.replace(" ", "")
+    # the player was started via start_script_async (no keystroke typing —
+    # Rhino 9 drops characters in long strings) and every value went
+    # through the undo-free send_keystrokes command
+    assert rhino.started_scripts == ['_-GrasshopperPlayer "C:/door.gh"']
+    assert rhino.legacy_inputs == []
+
+
+def test_runner_answers_path_prompt_with_enter():
+    """Rhino 9: the player asks for the path with the macro arg as default —
+    the loop must answer with a plain Enter (empty value), never by typing
+    the long path (SendKeystrokes drops characters in long strings)."""
+    from rhinoclaw.utils.gh_player import run_player_for_door
+
+    rhino = FakeRhino(
+        prompts=[
+            "Path of Grasshopper file to play <C:\\Users\\x\\RhinoC...>",
+            "Lichtbreite <800>",
+            "Command",
+        ],
+        before_ids=["old-1"],
+        after_ids=["old-1", "new-1"],
+        bboxes=[{"min": [0, 0, 0], "max": [900, 48, 2000]}],
+    )
+
+    result = run_player_for_door(rhino, "C:/door.gh", {"Lichtbreite": 900},
+                                 sleep=lambda s: None)
+
+    assert result["status"] == "success"
+    assert rhino.sent_inputs[0] == ""       # Enter accepts the default path
+    assert "900" in rhino.sent_inputs[1]
+
+
+def test_send_input_falls_back_for_pre_077_plugins():
+    """Old plugins without send_keystrokes get the legacy rhinoscript path,
+    and the capability is cached so only the first call pays the probe."""
+    from rhinoclaw.utils.gh_player import _send_input
+
+    rhino = FakeRhino(prompts=[], before_ids=[], after_ids=[], bboxes=[],
+                      send_keystrokes_supported=False)
+
+    _send_input(rhino, "900")
+    _send_input(rhino, "0,0,0")
+
+    assert rhino.sent_inputs == []
+    assert len(rhino.legacy_inputs) == 2
+    assert '"900"' in rhino.legacy_inputs[0]
+    assert rhino._rc_send_keystrokes_supported is False
 
 
 def test_runner_no_new_objects_reports_no_geometry():

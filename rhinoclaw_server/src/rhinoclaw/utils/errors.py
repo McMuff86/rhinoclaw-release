@@ -13,6 +13,11 @@ class ErrorCode:
     CONNECTION_TIMEOUT = "CONNECTION_TIMEOUT"
     CONNECTION_REFUSED = "CONNECTION_REFUSED"
 
+    # Protocol errors — mirrors the plugin's wire value for a command the
+    # dispatcher does not know (older plugin than the client expects).
+    # Used for capability probing, e.g. gh_player's send_keystrokes fallback.
+    UNKNOWN_COMMAND = "UNKNOWN_COMMAND"
+
     # Validation errors (2xx range conceptually)
     INVALID_PARAMS = "INVALID_PARAMS"
     MISSING_PARAMS = "MISSING_PARAMS"

@@ -19,6 +19,7 @@ CATALOG_OK = {
     "pass": True,
     "schema_version": 1,
     "global_match": True,
+    "catalog_port_inventory_complete": True,
     "scope": "full_catalog",
     "authoring_search_complete": True,
     "evidence": {
@@ -27,6 +28,7 @@ CATALOG_OK = {
             "component_count": 2534,
             "proxy_guid_sha256": "a" * 64,
             "component_contract_sha256": "b" * 64,
+            "ports_skipped_guids": [],
         },
         "runtime": {"proxy_count": 2534, "proxy_guid_sha256": "a" * 64},
         "used_component_count": 0,
@@ -92,7 +94,8 @@ def test_author_only_skips_solve_while_build_and_bake_solves_exactly_once():
     assert '["requested"] = false' in no_solve
     assert '["solve_count"] = 0' in no_solve
     assert '["runtime_messages_collected"] = false' in no_solve
-    assert "doc.NewSolution(true, GH_SolutionMode.Silent)" in solve
+    assert "doc.NewSolution(expireAllObjects, GH_SolutionMode.Silent)" in solve
+    assert "bool expireAllObjects = true" in solve
     assert "doc.SolutionStart +=" in solve
     assert "doc.SolutionEnd +=" in solve
     assert "solutionStartCount != 1 || solutionEndCount != 1" in solve
@@ -168,9 +171,11 @@ def test_definition_publication_is_same_directory_atomic_and_cleans_staging():
     append = publish.index('if (!archive.AppendObject(doc, "Definition"))')
     stage_write = publish.index("archive.WriteToFile(stagingPath")
     replace = publish.index("File.Replace(stagingPath, targetPath, null)")
+    overwrite_move = publish.index("File.Move(stagingPath, targetPath, true)")
     move = publish.index("File.Move(stagingPath, targetPath)")
     cleanup = publish.index("File.Delete(stagingPath)")
     assert append < stage_write < replace
+    assert replace < overwrite_move
     assert stage_write < move
     assert "WriteToFile(filePath" not in source
     assert "WriteToFile(targetPath" not in source
@@ -185,6 +190,8 @@ def test_definition_publication_is_same_directory_atomic_and_cleans_staging():
         '["compare_and_swap"] = false',
         '["foreign_target_change_detection"] = false',
         '["target_preexisted"] = targetPreexisted',
+        '["overwrite_move_fallback_used"] = overwriteMoveFallbackUsed',
+        '["replace_failure_type"] = replaceFailureType',
         '["staging_file_cleaned"] = stagingFileCleaned',
     ):
         assert evidence in publish
@@ -193,6 +200,24 @@ def test_definition_publication_is_same_directory_atomic_and_cleans_staging():
     assert "staging_file_cleaned={cleanupDetail}" in publish
     assert "this is not compare-and-swap" in publish
     assert "File.Replace would then overwrite that newer version" in publish
+    assert "File.Exists(stagingPath)" in publish
+    assert 'publicationMode = "move_overwrite"' in publish
+
+
+def test_sdk_curve_reference_is_guid_backed_and_verified_before_publication():
+    source = _source()
+    create = _slice(
+        source,
+        "private IGH_DocumentObject CreateSdkComponent(",
+        "// Custom Preview GUID:",
+    )
+    assert "ApplySdkReference(instance, comp)" in create
+    assert "instance is Param_Curve curveParameter" in create
+    assert "doc.Objects.FindId(objectId)" in create
+    assert "new GH_Curve(objectId)" in create
+    assert "referencedCurve.LoadGeometry(doc)" in create
+    assert "referencedCurve.IsReferencedGeometry" in create
+    assert "curveParameter.PersistentData.Append(referencedCurve)" in create
 
 
 def test_build_session_owns_document_server_cleanup_on_all_paths():

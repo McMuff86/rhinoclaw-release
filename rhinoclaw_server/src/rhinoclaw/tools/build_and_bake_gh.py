@@ -33,6 +33,12 @@ def build_and_bake_gh(
     the resulting geometry onto `layer`, returning the baked object GUIDs so a
     follow-up step can address them.
 
+    This is a geometry-only route, NOT a verified VisualARQ BIM workflow.
+    For actual Walls/Slabs/Spaces/Doors/Windows use the native va_create_*
+    tools, or author/load/solve a native VisualARQ graph and call
+    bake_grasshopper with exact output_targets and expected_visualarq_kind.
+    A successful Brep bake here does not prove any BIM product identity.
+
     ⚠️ LIMITATION (Rhino 8, verified 2026-06-04): Grasshopper **script
     components do NOT execute in headless solve** — confirmed for both the
     Python 3 (CPython) and legacy GhPython (IronPython) components. A definition

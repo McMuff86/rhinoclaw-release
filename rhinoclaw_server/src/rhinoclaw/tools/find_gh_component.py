@@ -91,8 +91,8 @@ def find_gh_component(
             "in":  [{"n": "Base", "nn": "B", "t": "Geometry"}, ...],
             "out": [{"n": "Extrusion", "nn": "E", "t": "Geometry"}],
             "desc": "..."}],
-         "catalog": {"component_count": 2643, "rhino_version": "8.33...",
-                     "generated": "2026-08-08"}}}
+         "catalog": {"component_count": 2767, "rhino_version": "9.0...",
+                     "generated": "2026-08-19"}}}
     """
     try:
         if not query or not query.strip():

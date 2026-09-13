@@ -305,7 +305,7 @@ def test_installed_catalog_freezes_all_plan_view_component_contracts():
         ROOT / "rhinoclaw_server" / "src" / "rhinoclaw" / "static" /
         "gh_components.json"
     )
-    catalog = json.loads(catalog_path.read_text())
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     by_guid = {item["guid"]: item for item in catalog["components"]}
 
     expected_params = {

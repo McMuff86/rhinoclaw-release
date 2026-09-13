@@ -1,5 +1,6 @@
 """Tests for the insert_library_part tool (mocked Rhino + mocked library)."""
 import json
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -170,8 +171,11 @@ class TestPartIdPath:
         assert parsed["data"]["part_id"] == PART_ID
         params = rhino.send_command.call_args[0][1]
         assert params["block_name"] == BLOCK_NAME
-        # WSL path -> Windows UNC path so Rhino on Windows can open it.
-        assert params["file_path"].startswith("\\\\path\to\your\directory")
+        # WSL paths become UNC; native Windows paths already work for Rhino.
+        if os.name == "nt":
+            assert params["file_path"].startswith(str(library))
+        else:
+            assert params["file_path"].startswith("\\\\path\to\your\directory")
         assert params["file_path"].endswith("part.3dm")
         assert "/" not in params["file_path"]
 
@@ -320,7 +324,10 @@ class TestNestedPartIdAndBlockFile:
         assert params["block_name"] == self.NESTED_BLOCK
         # .3dm filename comes from block.file, not a hardcoded part.3dm.
         assert params["file_path"].endswith(f"{self.NESTED_BLOCK}.3dm")
-        assert params["file_path"].startswith("\\\\path\to\your\directory")
+        if os.name == "nt":
+            assert params["file_path"].startswith(str(nested_library))
+        else:
+            assert params["file_path"].startswith("\\\\path\to\your\directory")
 
     @patch("rhinoclaw.tools.insert_library_part.get_rhino_connection")
     def test_traversal_part_id_rejected(self, mock_get_conn, nested_library):

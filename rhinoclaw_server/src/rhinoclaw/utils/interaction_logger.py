@@ -19,6 +19,7 @@ Usage:
 """
 import json
 import logging
+import os
 import threading
 import uuid
 from dataclasses import asdict, dataclass
@@ -73,6 +74,10 @@ class InteractionLogger:
         self._lock = threading.Lock()
         self._client_model: Optional[str] = None
         
+        # Explicit constructor paths take precedence over session configuration.
+        if log_dir is None:
+            log_dir = os.environ.get("RHINOCLAW_LOG_DIR") or None
+
         # Default log directory: rhinoclaw_server/logs/
         if log_dir is None:
             # Path: utils/interaction_logger.py -> utils -> rhinoclaw -> src -> rhinoclaw_server

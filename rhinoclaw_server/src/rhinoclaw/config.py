@@ -97,6 +97,35 @@ def _library_dir() -> Optional[Path]:
     return Path(raw).expanduser()
 
 
+def _kit_paths() -> tuple[Path, ...]:
+    """Explicit kit roots or scan directories (``RHINOCLAW_KITS``).
+
+    ``os.pathsep``-separated (``;`` on Windows, ``:`` on POSIX). Each entry
+    is either a kit root (contains ``rhinoclaw-kit.json``) or a directory
+    scanned one level deep.
+    """
+    raw = os.environ.get("RHINOCLAW_KITS")
+    if not raw:
+        return ()
+    return tuple(Path(part.strip()).expanduser() for part in raw.split(os.pathsep) if part.strip())
+
+
+def _kits_root() -> Optional[Path]:
+    """Optional extra scan root (``RHINOCLAW_KITS_ROOT``), one level deep."""
+    raw = os.environ.get("RHINOCLAW_KITS_ROOT")
+    if not raw:
+        return None
+    return Path(raw).expanduser()
+
+
+def _rahmentuer_root() -> Optional[Path]:
+    """Optional complete Rahmentuer script/vendor-asset root."""
+    raw = os.environ.get("RHINOCLAW_RAHMENTUER_ROOT")
+    if not raw:
+        return None
+    return Path(raw).expanduser()
+
+
 @dataclass(frozen=True)
 class Settings:
     """Runtime configuration. Access via :func:`get_settings`."""
@@ -111,6 +140,9 @@ class Settings:
     log_format: str  # "text" or "json"
     log_dir: Path
     library_dir: Optional[Path]
+    kit_paths: tuple[Path, ...]
+    kits_root: Optional[Path]
+    rahmentuer_root: Optional[Path]
 
     @property
     def auth_required(self) -> bool:
@@ -123,12 +155,19 @@ class Settings:
             port=_env_int("RHINOCLAW_PORT", 1999),
             ws_port=_env_int("RHINOCLAW_WS_PORT", 2000),
             timeout_seconds=_env_float("RHINOCLAW_TIMEOUT", 15.0),
-            max_timeout_seconds=_env_float("RHINOCLAW_MAX_TIMEOUT", 120.0),
+            # Aligned with the plugin's hard cap on its UI-thread wait
+            # (300 s) since 0.7.6 — with the old 120 s default, timeouts in
+            # (120, 300] that tools like execute_python3_code document for
+            # first-time `# r:` pip installs were silently unreachable.
+            max_timeout_seconds=_env_float("RHINOCLAW_MAX_TIMEOUT", 300.0),
             debug=_env_bool("RHINOCLAW_DEBUG", False),
             auth_token=os.environ.get("RHINOCLAW_AUTH_TOKEN") or None,
             log_format=_env_str("RHINOCLAW_LOG_FORMAT", "text").lower(),
             log_dir=_default_log_dir(),
             library_dir=_library_dir(),
+            kit_paths=_kit_paths(),
+            kits_root=_kits_root(),
+            rahmentuer_root=_rahmentuer_root(),
         )
 
 

@@ -163,11 +163,32 @@ def catalog_contract(
         )
 
     meta = catalog.get("meta") if isinstance(catalog.get("meta"), dict) else {}
+    raw_skipped = meta.get("ports_skipped_guids", [])
+    if not isinstance(raw_skipped, list):
+        raise ValueError("catalog.meta.ports_skipped_guids must be a list")
+    skipped_guids = []
+    for value in raw_skipped:
+        try:
+            guid = UUID(str(value))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise ValueError(
+                "catalog.meta.ports_skipped_guids contains an invalid GUID"
+            ) from exc
+        if guid.int == 0:
+            raise ValueError(
+                "catalog.meta.ports_skipped_guids cannot contain Guid.Empty"
+            )
+        skipped_guids.append(str(guid))
+    if len(set(skipped_guids)) != len(skipped_guids):
+        raise ValueError(
+            "catalog.meta.ports_skipped_guids contains duplicate GUIDs"
+        )
     return {
         "schema_version": CATALOG_CONTRACT_SCHEMA,
         "component_count": len(ordered),
         "proxy_guid_sha256": _sha256_lines(proxy_guids),
         "component_contract_sha256": _sha256_lines(canonical_components),
+        "ports_skipped_guids": sorted(skipped_guids),
         "source": {
             "rhino_version": meta.get("rhino_version"),
             "generated": meta.get("generated"),
@@ -232,26 +253,39 @@ def require_catalog_verification(
             )
 
         global_match = verification.get("global_match")
+        catalog_complete = verification.get(
+            "catalog_port_inventory_complete"
+        )
         scope = verification.get("scope")
         search_complete = verification.get("authoring_search_complete")
         if not isinstance(global_match, bool):
             issues.append("catalog_verification.global_match must be boolean")
-        if global_match is True:
+        if not isinstance(catalog_complete, bool):
+            issues.append(
+                "catalog_verification.catalog_port_inventory_complete "
+                "must be boolean"
+            )
+        if global_match is True and catalog_complete is True:
             if scope != "full_catalog" or search_complete is not True:
                 issues.append(
-                    "a global catalog match requires scope=full_catalog and "
+                    "a complete global catalog match requires "
+                    "scope=full_catalog and "
                     "authoring_search_complete=true"
                 )
-        elif global_match is False:
+        elif isinstance(global_match, bool) and isinstance(
+            catalog_complete, bool
+        ):
             if scope != "used_components_only" or search_complete is not False:
                 issues.append(
-                    "catalog drift requires scope=used_components_only and "
+                    "catalog drift or skipped port inventory requires "
+                    "scope=used_components_only and "
                     "authoring_search_complete=false"
                 )
             warning = verification.get("warning")
             if not isinstance(warning, str) or not warning.strip():
                 issues.append(
-                    "catalog drift requires an explicit warning"
+                    "catalog drift or skipped port inventory requires an "
+                    "explicit warning"
                 )
 
         evidence = verification.get("evidence")
@@ -279,6 +313,7 @@ def require_catalog_verification(
             or isinstance(contract.get("component_count"), bool)
             or not _is_sha256(contract.get("proxy_guid_sha256"))
             or not _is_sha256(contract.get("component_contract_sha256"))
+            or not isinstance(contract.get("ports_skipped_guids"), list)
         ):
             issues.append(
                 "catalog_verification.evidence.contract is incomplete"

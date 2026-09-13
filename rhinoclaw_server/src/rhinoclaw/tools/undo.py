@@ -22,7 +22,7 @@ def undo(ctx: Context) -> str:
         {
           "success": true,
           "data": {
-            "did_undo": true | false,   # false if the stack was already empty
+            "did_undo": true | false,   # inspect outcome and recording state when false
             "message": "..."
           }
         }
@@ -30,6 +30,11 @@ def undo(ctx: Context) -> str:
     try:
         rhino = get_rhino_connection()
         result = rhino.send_command("undo", {})
+        if result.get("success") is False:
+            response = from_exception(RuntimeError(result.get("message", "Undo unavailable")),
+                                      code=ErrorCode.RHINO_ERROR)
+            response["data"] = result
+            return json.dumps(response)
         did_undo = bool(result.get("did_undo", False))
         return json.dumps(ok(
             message=result.get(

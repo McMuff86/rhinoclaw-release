@@ -67,13 +67,18 @@ def build_command(
     request_id: Optional[str] = None,
     idempotency_key: Optional[str] = None,
     auth_token: Optional[str] = None,
+    timeout: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Assemble a RhinoClaw command frame.
 
     ``{type, params}`` always; ``request_id``/``idempotency_key`` are attached
     only when provided (the CLI omits them); ``auth`` only when a non-empty
     token is passed. The plugin enforces ``auth`` only when it has a token of
-    its own configured.
+    its own configured. ``timeout`` (seconds) sizes the plugin's UI-thread
+    wait for this command — the plugin clamps it to [1, 300] and falls back
+    to 60 s when omitted. Long-running scripts (e.g. a first-time ``# r:``
+    pip install in execute_python3_code) need it; without it they die at the
+    plugin's 60 s default no matter what the client's socket timeout is.
     """
     command: Dict[str, Any] = {
         "type": command_type,
@@ -85,6 +90,8 @@ def build_command(
         command["idempotency_key"] = idempotency_key
     if auth_token:
         command["auth"] = auth_token
+    if timeout is not None:
+        command["timeout"] = timeout
     return command
 
 

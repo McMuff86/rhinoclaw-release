@@ -4,6 +4,52 @@ import json
 from unittest.mock import MagicMock, patch
 
 
+def _solve_result(
+    definition_id="abc12345",
+    runtime_messages=None,
+    expire_all=True,
+):
+    runtime_messages = runtime_messages or []
+    counts = {
+        level: sum(
+            message.get("level") == level for message in runtime_messages
+        )
+        for level in ("remark", "warning", "error")
+    }
+    legacy = {
+        level: [
+            {
+                "component": message["component"],
+                "message": message["message"],
+            }
+            for message in runtime_messages
+            if message.get("level") == level
+        ]
+        for level in counts
+    }
+    return {
+        "definition_id": definition_id,
+        "status": "solved" if counts["error"] == 0 else "solved_with_errors",
+        "errors": legacy["error"],
+        "warnings": legacy["warning"],
+        "remarks": legacy["remark"],
+        "runtime_messages": runtime_messages,
+        "solution": {
+            "requested": True,
+            "solve_count": 1,
+            "solution_start_count": 1,
+            "solution_end_count": 1,
+            "expire_all_objects": expire_all,
+            "mode": "Silent",
+            "state": "PostProcess",
+            "duration_ms": 1.0,
+            "runtime_messages_collected": True,
+            "runtime_message_count": len(runtime_messages),
+            "runtime_message_counts": counts,
+        },
+    }
+
+
 class TestLoadGrasshopperDefinition:
     """Tests for load_grasshopper_definition tool."""
 
@@ -18,8 +64,18 @@ class TestLoadGrasshopperDefinition:
             "file_path": "C:/test/door.gh",
             "file_name": "door.gh",
             "parameters": [
-                {"name": "Height", "nickname": "Lichthoehe", "type": "NumberSlider", "value": 2200}
+                {
+                    "name": "Height",
+                    "nickname": "Lichthoehe",
+                    "type": "NumberSlider",
+                    "value": 2200,
+                    "parameter_instance_id":
+                        "11111111-1111-1111-1111-111111111111",
+                    "settable_by_instance_id": True,
+                }
             ],
+            "parameter_identity": "parameter_instance_id",
+            "settable_parameter_count": 1,
             "outputs": [
                 {"name": "Geometry", "nickname": "Geo", "type": "Brep", "component_name": "Bake"}
             ],
@@ -71,6 +127,8 @@ class TestLoadGrasshopperDefinition:
             "file_path": "C:/test/door.ghx",
             "file_name": "door.ghx",
             "parameters": [],
+            "parameter_identity": "parameter_instance_id",
+            "settable_parameter_count": 0,
             "outputs": [],
             "object_count": 5
         }
@@ -80,6 +138,43 @@ class TestLoadGrasshopperDefinition:
 
         result_data = json.loads(result)
         assert result_data["success"] is True
+
+    def test_load_rejects_duplicate_parameter_identity(self):
+        from rhinoclaw.tools.load_grasshopper_definition import (
+            load_grasshopper_definition,
+        )
+
+        parameter_id = "11111111-1111-1111-1111-111111111111"
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {
+            "definition_id": "abc12345",
+            "file_path": "C:/test/duplicate.gh",
+            "file_name": "duplicate.gh",
+            "parameters": [
+                {
+                    "parameter_instance_id": parameter_id,
+                    "settable_by_instance_id": True,
+                },
+                {
+                    "parameter_instance_id": parameter_id,
+                    "settable_by_instance_id": True,
+                },
+            ],
+            "parameter_identity": "parameter_instance_id",
+            "settable_parameter_count": 2,
+            "outputs": [],
+            "object_count": 2,
+        }
+        with patch(
+            "rhinoclaw.tools.load_grasshopper_definition.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            result = load_grasshopper_definition(
+                MagicMock(), "C:/test/duplicate.gh")
+        payload = json.loads(result)
+        assert payload["success"] is False
+        assert payload["code"] == "VERIFICATION_FAILED"
+        assert payload["data"]["parameter_verification"]["pass"] is False
 
 
 class TestSetGrasshopperParameter:
@@ -183,6 +278,152 @@ class TestSetGrasshopperParameter:
         assert "value is required" in result_data["message"]
 
 
+class TestSetGrasshopperParameters:
+    """Tests for exact, atomic loaded-definition parameter batches."""
+
+    first_id = "11111111-1111-1111-1111-111111111111"
+    second_id = "22222222-2222-2222-2222-222222222222"
+
+    def test_atomic_batch_success_and_canonical_request(self):
+        from rhinoclaw.tools.set_grasshopper_parameters import (
+            set_grasshopper_parameters,
+        )
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {
+            "definition_id": "abc12345",
+            "status": "set",
+            "atomic": True,
+            "selector": "parameter_instance_id",
+            "mutation_attempted": True,
+            "assignment_count": 2,
+            "assignments": [
+                {
+                    "parameter_instance_id": self.first_id,
+                    "requested_value": 2400,
+                    "readback_match": True,
+                },
+                {
+                    "parameter_instance_id": self.second_id,
+                    "requested_value": True,
+                    "readback_match": True,
+                },
+            ],
+        }
+        requested = [
+            {"parameter_instance_id": self.first_id.upper(), "value": 2400},
+            {"parameter_instance_id": self.second_id, "value": True},
+        ]
+        with patch(
+            "rhinoclaw.tools.set_grasshopper_parameters.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            result = set_grasshopper_parameters(
+                MagicMock(), "abc12345", requested)
+
+        payload = json.loads(result)
+        assert payload["success"] is True
+        assert payload["data"]["verification"]["pass"] is True
+        mock_rhino.send_command.assert_called_once_with(
+            "set_grasshopper_parameters",
+            {
+                "definition_id": "abc12345",
+                "assignments": [
+                    {"parameter_instance_id": self.first_id, "value": 2400},
+                    {"parameter_instance_id": self.second_id, "value": True},
+                ],
+            },
+        )
+
+    @pytest.mark.parametrize(
+        "assignments",
+        [
+            [],
+            [{"parameter_instance_id": "not-a-guid", "value": 1}],
+            [{"parameter_instance_id": first_id, "value": None}],
+            [
+                {"parameter_instance_id": first_id, "value": 1},
+                {"parameter_instance_id": first_id.upper(), "value": 2},
+            ],
+            [{"parameter_instance_id": first_id, "value": 1, "name": "x"}],
+        ],
+    )
+    def test_invalid_batches_fail_before_connection(self, assignments):
+        from rhinoclaw.tools.set_grasshopper_parameters import (
+            set_grasshopper_parameters,
+        )
+
+        with patch(
+            "rhinoclaw.tools.set_grasshopper_parameters.get_rhino_connection"
+        ) as connection:
+            result = set_grasshopper_parameters(
+                MagicMock(), "abc12345", assignments)
+        assert json.loads(result)["success"] is False
+        connection.assert_not_called()
+
+    def test_plugin_preflight_maps_to_precondition_failed(self):
+        from rhinoclaw.tools.set_grasshopper_parameters import (
+            set_grasshopper_parameters,
+        )
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {
+            "definition_id": "abc12345",
+            "status": "preflight_failed",
+            "atomic": True,
+            "mutation_attempted": False,
+            "issues": [{"code": "INVALID_PARAMETER_VALUE"}],
+        }
+        with patch(
+            "rhinoclaw.tools.set_grasshopper_parameters.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            result = set_grasshopper_parameters(MagicMock(), "abc12345", [{
+                "parameter_instance_id": self.first_id,
+                "value": 999999,
+            }])
+        payload = json.loads(result)
+        assert payload["success"] is False
+        assert payload["code"] == "PRECONDITION_FAILED"
+        assert payload["data"]["mutation_attempted"] is False
+
+    @pytest.mark.parametrize(
+        ("rollback_complete", "expected_code"),
+        [(True, "VERIFICATION_FAILED"), (False, "PARTIAL_MUTATION")],
+    )
+    def test_failed_commit_classifies_rollback(
+        self, rollback_complete, expected_code
+    ):
+        from rhinoclaw.tools.set_grasshopper_parameters import (
+            set_grasshopper_parameters,
+        )
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {
+            "definition_id": "abc12345",
+            "status": "failed_after_mutation",
+            "atomic": True,
+            "mutation_attempted": True,
+            "failure": "readback mismatch",
+            "rollback": {
+                "attempted": True,
+                "complete": rollback_complete,
+                "issues": [] if rollback_complete else [{"stage": "readback"}],
+            },
+        }
+        with patch(
+            "rhinoclaw.tools.set_grasshopper_parameters.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            result = set_grasshopper_parameters(MagicMock(), "abc12345", [{
+                "parameter_instance_id": self.first_id,
+                "value": 1,
+            }])
+        payload = json.loads(result)
+        assert payload["success"] is False
+        assert payload["code"] == expected_code
+
+
 class TestSolveGrasshopper:
     """Tests for solve_grasshopper tool."""
 
@@ -192,12 +433,7 @@ class TestSolveGrasshopper:
 
         mock_ctx = MagicMock()
         mock_rhino = MagicMock()
-        mock_rhino.send_command.return_value = {
-            "definition_id": "abc12345",
-            "status": "solved",
-            "errors": [],
-            "warnings": []
-        }
+        mock_rhino.send_command.return_value = _solve_result()
 
         with patch("rhinoclaw.tools.solve_grasshopper.get_rhino_connection", return_value=mock_rhino):
             result = solve_grasshopper(mock_ctx, "abc12345")
@@ -213,14 +449,16 @@ class TestSolveGrasshopper:
 
         mock_ctx = MagicMock()
         mock_rhino = MagicMock()
-        mock_rhino.send_command.return_value = {
-            "definition_id": "abc12345",
-            "status": "solved_with_errors",
-            "errors": [
-                {"component": "Divide", "message": "Division by zero"}
-            ],
-            "warnings": []
-        }
+        runtime_messages = [{
+            "component": "Divide",
+            "component_name": "Division",
+            "component_id": "11111111-1111-1111-1111-111111111111",
+            "component_type": "Grasshopper.Components.Division",
+            "level": "error",
+            "message": "Division by zero",
+        }]
+        mock_rhino.send_command.return_value = _solve_result(
+            runtime_messages=runtime_messages)
 
         with patch("rhinoclaw.tools.solve_grasshopper.get_rhino_connection", return_value=mock_rhino):
             result = solve_grasshopper(mock_ctx, "abc12345")
@@ -236,20 +474,52 @@ class TestSolveGrasshopper:
 
         mock_ctx = MagicMock()
         mock_rhino = MagicMock()
-        mock_rhino.send_command.return_value = {
-            "definition_id": "abc12345",
-            "status": "solved",
-            "errors": [],
-            "warnings": []
-        }
+        mock_rhino.send_command.return_value = _solve_result(expire_all=False)
 
         with patch("rhinoclaw.tools.solve_grasshopper.get_rhino_connection", return_value=mock_rhino):
             result = solve_grasshopper(mock_ctx, "abc12345", expire_all=False)
 
+        assert json.loads(result)["success"] is True
         mock_rhino.send_command.assert_called_once_with("solve_grasshopper", {
             "definition_id": "abc12345",
             "expire_all": False
         })
+
+    def test_solve_rejects_missing_cycle_evidence(self):
+        from rhinoclaw.tools.solve_grasshopper import solve_grasshopper
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {
+            "definition_id": "abc12345",
+            "status": "solved",
+            "errors": [],
+            "warnings": [],
+        }
+        with patch(
+            "rhinoclaw.tools.solve_grasshopper.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            result = solve_grasshopper(MagicMock(), "abc12345")
+        payload = json.loads(result)
+        assert payload["success"] is False
+        assert payload["code"] == "VERIFICATION_FAILED"
+        assert payload["data"]["verification"]["pass"] is False
+
+    def test_solve_rejects_runtime_message_count_mismatch(self):
+        from rhinoclaw.tools.solve_grasshopper import solve_grasshopper
+
+        mock_rhino = MagicMock()
+        inconsistent = _solve_result()
+        inconsistent["solution"]["runtime_message_count"] = 1
+        mock_rhino.send_command.return_value = inconsistent
+        with patch(
+            "rhinoclaw.tools.solve_grasshopper.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            result = solve_grasshopper(MagicMock(), "abc12345")
+        payload = json.loads(result)
+        assert payload["success"] is False
+        assert payload["code"] == "VERIFICATION_FAILED"
 
     def test_solve_missing_definition_id(self):
         """Test solve with missing definition_id fails."""
@@ -488,6 +758,129 @@ class TestBakeGrasshopper:
         assert result["success"] is False
         assert result["code"] == "VERIFICATION_FAILED"
         assert mock_rhino.send_command.call_count == 1
+
+    def test_guarded_bakeaware_preflight_failure_preserves_evidence(self):
+        from rhinoclaw.tools.bake_grasshopper import bake_grasshopper
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {
+            "definition_id": "abc12345",
+            "baked_count": 0,
+            "baked_objects": [],
+            "bake_mode": "guarded_bake_aware",
+            "guarded_bake_aware": True,
+            "mutation_attempted": False,
+            "bake_status": "preflight_failed",
+            "failure": "mixed BakeAware/non-BakeAware batch",
+            "evidence": [],
+        }
+        with patch(
+            "rhinoclaw.tools.bake_grasshopper.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            result = json.loads(bake_grasshopper(
+                MagicMock(),
+                "abc12345",
+                output_targets=[{
+                    "component_instance_id":
+                        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "output_instance_id":
+                        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                }],
+            ))
+
+        assert result["success"] is False
+        assert result["code"] == "PRECONDITION_FAILED"
+        assert result["data"]["mutation_attempted"] is False
+        assert mock_rhino.send_command.call_count == 1
+
+    def test_guarded_bakeaware_failure_after_mutation_is_partial(self):
+        from rhinoclaw.tools.bake_grasshopper import bake_grasshopper
+
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.return_value = {
+            "definition_id": "abc12345",
+            "baked_count": 0,
+            "baked_objects": [],
+            "bake_mode": "guarded_bake_aware",
+            "guarded_bake_aware": True,
+            "mutation_attempted": True,
+            "bake_status": "failed_after_mutation",
+            "failure": "native BakeGeometry returned false",
+            "covered_state_restored": True,
+            "unmeasured_state": ["visualarq_plugin_private_state"],
+            "evidence": [{"success": False}],
+        }
+        with patch(
+            "rhinoclaw.tools.bake_grasshopper.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            result = json.loads(bake_grasshopper(
+                MagicMock(),
+                "abc12345",
+                output_targets=[{
+                    "component_instance_id":
+                        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "output_instance_id":
+                        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                }],
+            ))
+
+        assert result["success"] is False
+        assert result["code"] == "PARTIAL_MUTATION"
+        assert result["data"]["covered_state_restored"] is True
+        assert "visualarq_plugin_private_state" in \
+            result["data"]["unmeasured_state"]
+        assert mock_rhino.send_command.call_count == 1
+
+    def test_guarded_bakeaware_success_still_requires_active_readback(self):
+        from rhinoclaw.tools.bake_grasshopper import bake_grasshopper
+
+        object_id = "11111111-1111-4111-8111-111111111111"
+        mock_rhino = MagicMock()
+        mock_rhino.send_command.side_effect = [
+            {
+                "definition_id": "abc12345",
+                "baked_count": 1,
+                "baked_objects": [{"id": object_id}],
+                "bake_mode": "guarded_bake_aware",
+                "guarded_bake_aware": True,
+                "mutation_attempted": True,
+                "bake_status": "success",
+                "invocation_count": 1,
+                "evidence": [{
+                    "success": True,
+                    "ownership_proven": True,
+                    "goo_type": "VisualARQ.GhVaWall",
+                }],
+            },
+            {
+                "count": 1,
+                "missing_count": 0,
+                "results": [{"id": object_id}],
+                "missing": [],
+            },
+        ]
+        with patch(
+            "rhinoclaw.tools.bake_grasshopper.get_rhino_connection",
+            return_value=mock_rhino,
+        ):
+            result = json.loads(bake_grasshopper(
+                MagicMock(),
+                "abc12345",
+                output_targets=[{
+                    "component_instance_id":
+                        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "output_instance_id":
+                        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                }],
+            ))
+
+        assert result["success"] is True
+        assert result["data"]["verification"]["pass"] is True
+        assert result["data"]["bake_mode"] == "guarded_bake_aware"
+        assert mock_rhino.send_command.call_args_list[1].args == (
+            "get_objects_info", {"ids": [object_id]})
 
     def test_bake_missing_definition_id(self):
         """Test bake with missing definition_id fails."""
@@ -739,7 +1132,17 @@ class TestGrasshopperApiWorkflow:
                 "definition_id": "abc12345",
                 "file_path": "C:/test/door.gh",
                 "file_name": "door.gh",
-                "parameters": [{"name": "Height", "nickname": "H", "type": "NumberSlider", "value": 2200}],
+                "parameters": [{
+                    "name": "Height",
+                    "nickname": "H",
+                    "type": "NumberSlider",
+                    "value": 2200,
+                    "parameter_instance_id":
+                        "11111111-1111-1111-1111-111111111111",
+                    "settable_by_instance_id": True,
+                }],
+                "parameter_identity": "parameter_instance_id",
+                "settable_parameter_count": 1,
                 "outputs": [],
                 "object_count": 10
             },
@@ -752,12 +1155,7 @@ class TestGrasshopperApiWorkflow:
                 "status": "set"
             },
             # solve_grasshopper
-            {
-                "definition_id": "abc12345",
-                "status": "solved",
-                "errors": [],
-                "warnings": []
-            },
+            _solve_result(),
             # bake_grasshopper
             {
                 "definition_id": "abc12345",

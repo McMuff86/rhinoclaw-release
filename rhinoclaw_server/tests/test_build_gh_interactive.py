@@ -141,6 +141,7 @@ BUILD_OK = {
         "pass": True,
         "schema_version": 1,
         "global_match": False,
+        "catalog_port_inventory_complete": True,
         "scope": "used_components_only",
         "authoring_search_complete": False,
         "warning": "global proxy drift; used component contract is exact",
@@ -150,6 +151,7 @@ BUILD_OK = {
                 "component_count": 2534,
                 "proxy_guid_sha256": "b" * 64,
                 "component_contract_sha256": "c" * 64,
+                "ports_skipped_guids": [],
             },
             "runtime": {
                 "proxy_count": 2643,
@@ -200,11 +202,39 @@ class TestGhCritic:
 
     def test_expectations_pass_within_tolerance(self):
         res = check_expectations([[-20, -10, -5], [20, 10, 5]], 1,
-                                 {"min_count": 1, "dims_mm": [40, 20, 10],
+                                 {"exact_count": 1,
+                                  "dims_mm": [40, 20, 10],
                                   "bbox_min": [-20, -10, -5]})
         assert res["ok"] is True
         assert res["checked"] == 3
         assert res["hints"] == []
+
+    def test_exact_count_rejects_surplus_baked_objects(self):
+        res = check_expectations(None, 21, {"exact_count": 20})
+
+        assert res["ok"] is False
+        assert res["checks"] == [{
+            "check": "exact_count",
+            "ok": False,
+            "expected": 20,
+            "measured": 21,
+        }]
+        assert any("missing or surplus" in hint for hint in res["hints"])
+
+    @pytest.mark.parametrize("value", [None, True, 0, -1, 1.5, "20"])
+    def test_exact_count_requires_positive_integer(self, value):
+        assert any(
+            "expect.exact_count must be a positive integer" in issue
+            for issue in validate_expectations({"exact_count": value})
+        )
+
+    def test_count_contract_rejects_impossible_minimum(self):
+        assert validate_expectations({
+            "min_count": 21,
+            "exact_count": 20,
+        }) == [
+            "expect.min_count cannot be greater than expect.exact_count"
+        ]
 
     def test_expectations_fail_names_the_worst_axis(self):
         res = check_expectations([[-20, -10, -5], [20, 10, 5]], 1,
@@ -532,10 +562,31 @@ class TestBuildGhInteractive:
                    for issue in result["data"]["lint"]["errors"])
         rhino.send_command.assert_not_called()
 
+    def test_invalid_exact_count_fails_before_rhino_round_trip(self):
+        rhino = MagicMock()
+        result = self._call(rhino, expect={"exact_count": True})
+
+        assert result["data"]["pass"] is False
+        assert result["data"]["stage_reached"] == "lint"
+        assert any("exact_count" in issue
+                   for issue in result["data"]["lint"]["errors"])
+        rhino.send_command.assert_not_called()
+
+    @pytest.mark.parametrize("value", [None, 0])
+    def test_unfulfillable_exact_count_fails_before_rhino_round_trip(self, value):
+        rhino = MagicMock()
+        result = self._call(rhino, expect={"exact_count": value})
+
+        assert result["data"]["pass"] is False
+        assert result["data"]["stage_reached"] == "lint"
+        assert any("exact_count" in issue
+                   for issue in result["data"]["lint"]["errors"])
+        rhino.send_command.assert_not_called()
+
     def test_full_semantic_contract_passes_from_two_readbacks(self):
         rhino = _mock_rhino([BUILD_OK])
         result = self._call(rhino, expect={
-            "min_count": 1,
+            "exact_count": 1,
             "geometry_types": ["Brep"],
             "object_types": ["Brep"],
             "layer": "GH_Bake",
@@ -744,7 +795,28 @@ class TestBuildGhInteractive:
         assert data["measured"]["verification"]["pass"] is False
         assert data["expect_check"]["checks"][0]["measured"] == 0
         assert data["expect_check"]["ok"] is False
+        assert data["expect_check"]["measurement_available"] is False
+        assert data["expect_check"]["hints"] == []
         assert any("not active" in hint for hint in data["hints"])
+
+    def test_exact_count_does_not_blame_output_tree_when_readback_failed(self):
+        rhino = _mock_rhino(
+            [BUILD_OK],
+            objects_info={
+                "count": 0,
+                "missing_count": 1,
+                "results": [],
+                "missing": [{"id": BAKED_ID, "reason": "not_found"}],
+            },
+        )
+
+        result = self._call(rhino, expect={"exact_count": 1})
+        data = result["data"]
+
+        assert data["pass"] is False
+        assert data["expect_check"]["measurement_available"] is False
+        assert data["expect_check"]["hints"] == []
+        assert not any("output tree" in hint.lower() for hint in data["hints"])
 
     @pytest.mark.parametrize(
         ("baked_count", "baked_ids", "issue"),

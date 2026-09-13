@@ -3165,6 +3165,44 @@ def test_object_inventory_exposes_classifications_and_measured_wall_fields():
     assert '"scan_complete"' in list_code
 
 
+def test_object_inventory_layer_prefix_filters_before_classification():
+    from rhinoclaw.tools.visualarq import va_list_objects
+
+    rhino = _rhino({
+        "status": "success", "kind": "wall", "layer_prefix": "Plot9::",
+        "objects": [], "matched_count": 0, "returned_count": 0,
+        "truncated": False, "scan_complete": True, "scan_error_count": 0,
+        "scan_errors": [], "scan_errors_truncated": False,
+    })
+    with patch(PATCH, return_value=rhino):
+        listed = json.loads(va_list_objects(
+            MagicMock(), kind="wall", layer_prefix="Plot9::"))
+
+    assert listed["success"] is True
+    assert listed["data"]["layer_prefix"] == "Plot9::"
+    code = rhino.send_command.call_args[0][1]["code"]
+    compile(code, "<va_list_objects>", "exec")
+    assert _params_from_code(code)["layer_prefix"] == "Plot9::"
+    assert "obj_layer_path.startswith(layer_prefix)" in code
+    # The layer filter must run before any VisualARQ classifier pays for
+    # identity probing — that is the whole point of the parameter.
+    assert (
+        code.index("obj_layer_path.startswith(layer_prefix)")
+        < code.index("va_visualarq_identity_probe(obj.Id)")
+    )
+    assert 'snapshot["layer"] = obj_layer_path' in code
+
+
+def test_object_inventory_rejects_bad_layer_prefix():
+    from rhinoclaw.tools.visualarq import va_list_objects
+
+    for bad in ["", "   ", "x" * 501, 42]:
+        result = json.loads(va_list_objects(
+            MagicMock(), kind="wall", layer_prefix=bad))
+        assert result["success"] is False, bad
+        assert result["code"] == "INVALID_PARAMS"
+
+
 def test_visualarq_new_tools_are_reexported():
     import rhinoclaw
 
