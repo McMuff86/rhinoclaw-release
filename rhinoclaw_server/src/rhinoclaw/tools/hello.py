@@ -19,7 +19,8 @@ def hello(ctx: Context) -> str:
     Returns (in `data`):
         - plugin_version
         - auth_required: does the plugin require a token?
-        - mode: "tcpstart" (remote/0.0.0.0) | "mcpstart" (local)
+        - mode: "tcp" (remote, 0.0.0.0) | "mcp" (local, 127.0.0.1). Plugins before
+          0.8.0 report the old command names "tcpstart" / "mcpstart" instead.
         - gh_available: is Grasshopper loaded?
         - blocked: is THIS remote in the brute-force cooldown? (not a token check)
         - blocked_until: ISO-8601 (only when blocked)

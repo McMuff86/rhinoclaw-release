@@ -11,7 +11,78 @@ from mcp.server.fastmcp import Context
 
 from rhinoclaw.server import get_rhino_connection, logger, mcp
 from rhinoclaw.utils.errors import ErrorCode
-from rhinoclaw.utils.responses import from_exception, ok
+from rhinoclaw.utils.responses import error, from_exception, ok
+
+
+def _verify_solve_evidence(result, expected_expire_all):
+    issues = []
+    solution = result.get("solution")
+    runtime_messages = result.get("runtime_messages")
+    if not isinstance(solution, dict):
+        issues.append("solution evidence must be an object")
+        solution = {}
+    expected = {
+        "requested": True,
+        "solve_count": 1,
+        "solution_start_count": 1,
+        "solution_end_count": 1,
+        "runtime_messages_collected": True,
+    }
+    for key, value in expected.items():
+        if solution.get(key) != value:
+            issues.append(f"solution.{key} must equal {value!r}")
+    if solution.get("mode") != "Silent":
+        issues.append("solution.mode must be 'Silent'")
+    if solution.get("expire_all_objects") is not expected_expire_all:
+        issues.append(
+            "solution.expire_all_objects does not match the request"
+        )
+    if not isinstance(runtime_messages, list):
+        issues.append("runtime_messages must be a list")
+        runtime_messages = []
+
+    actual_counts = {"remark": 0, "warning": 0, "error": 0}
+    for index, item in enumerate(runtime_messages):
+        if not isinstance(item, dict):
+            issues.append(f"runtime_messages[{index}] must be an object")
+            continue
+        level = item.get("level")
+        if level not in actual_counts:
+            issues.append(f"runtime_messages[{index}].level is invalid")
+            continue
+        if not isinstance(item.get("component_id"), str):
+            issues.append(
+                f"runtime_messages[{index}].component_id must be a string"
+            )
+        if not isinstance(item.get("message"), str):
+            issues.append(f"runtime_messages[{index}].message must be a string")
+        actual_counts[level] += 1
+
+    reported_counts = solution.get("runtime_message_counts")
+    if not isinstance(reported_counts, dict):
+        issues.append("solution.runtime_message_counts must be an object")
+    else:
+        for level, count in actual_counts.items():
+            if reported_counts.get(level) != count:
+                issues.append(
+                    f"solution.runtime_message_counts.{level} does not "
+                    "match runtime_messages"
+                )
+    if solution.get("runtime_message_count") != len(runtime_messages):
+        issues.append(
+            "solution.runtime_message_count does not match runtime_messages"
+        )
+    for field, level in (
+        ("remarks", "remark"),
+        ("warnings", "warning"),
+        ("errors", "error"),
+    ):
+        messages = result.get(field)
+        if not isinstance(messages, list):
+            issues.append(f"{field} must be a list")
+        elif len(messages) != actual_counts[level]:
+            issues.append(f"{field} count does not match runtime_messages")
+    return {"pass": not issues, "issues": issues}
 
 
 @mcp.tool()
@@ -39,6 +110,10 @@ def solve_grasshopper(
         - status: "solved" or "solved_with_errors"
         - errors: Array of error messages (if any)
         - warnings: Array of warning messages (if any)
+        - remarks: Array of remark messages (if any)
+        - runtime_messages: Complete structured message inventory
+        - solution: Exactly-one-cycle SolutionStart/SolutionEnd evidence,
+          solve mode, duration and message counts
     
     Example:
         >>> # Load and configure
@@ -76,6 +151,15 @@ def solve_grasshopper(
             "definition_id": definition_id,
             "expire_all": expire_all
         })
+
+        verification = _verify_solve_evidence(result, expire_all)
+        result["verification"] = verification
+        if not verification["pass"]:
+            return json.dumps(error(
+                "Grasshopper solve returned incomplete or inconsistent evidence",
+                code=ErrorCode.VERIFICATION_FAILED,
+                data=result,
+            ))
 
         # Format message based on status
         status = result.get("status", "unknown")

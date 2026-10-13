@@ -26,10 +26,12 @@ def save_file(
     - If file_path is provided, performs "Save As" to new location
     - If file_path is None and document was never saved, returns an error
     - File path must end with .3dm
+    - Success requires reopening the saved 3DM and finding all active object IDs.
+      Geometry, BIM semantics and plugin-private data are not validated by this check.
     """
-    if file_path and not file_path.lower().endswith('.3dm'):
+    if file_path is not None and (not file_path.strip() or not file_path.lower().endswith('.3dm')):
         return json.dumps(from_exception(
-            ValueError("file_path must be a .3dm file"),
+            ValueError("file_path must be a non-empty .3dm path; omit it to save the current document"),
             code=ErrorCode.INVALID_PARAMS
         ))
     
@@ -37,14 +39,28 @@ def save_file(
         rhino = get_rhino_connection()
         
         params = {}
-        if file_path:
+        if file_path is not None:
             params["file_path"] = file_path
         
-        result = rhino.send_command("save_file", params)
+        result = rhino.send_command("save_file", params, timeout=120.0)
+
+        verification = result.get("verification")
+        if (result.get("success") is False
+                or not isinstance(verification, dict)
+                or verification.get("pass") is not True):
+            response = from_exception(
+                ValueError(result.get("message") or
+                           "Save reported without successful independent verification. "
+                           "The file may already exist; check it before retrying. "
+                           "Update the Rhino plugin if verification metadata is absent."),
+                code=ErrorCode.RHINO_ERROR,
+            )
+            response["data"] = result
+            return json.dumps(response)
         
         saved_path = result.get("file_path", file_path or "current document")
         return json.dumps(ok(
-            message=f"Saved file: {saved_path}",
+            message=f"Saved and checked file/object IDs: {saved_path}",
             data=result
         ))
     except Exception as e:

@@ -27,6 +27,11 @@ def redo(ctx: Context) -> str:
     try:
         rhino = get_rhino_connection()
         result = rhino.send_command("redo", {})
+        if result.get("success") is False:
+            response = from_exception(RuntimeError(result.get("message", "Redo unavailable")),
+                                      code=ErrorCode.RHINO_ERROR)
+            response["data"] = result
+            return json.dumps(response)
         did_redo = bool(result.get("did_redo", False))
         return json.dumps(ok(
             message=result.get(

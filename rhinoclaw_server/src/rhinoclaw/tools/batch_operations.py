@@ -17,12 +17,19 @@ def batch_operations(
     on_error: ErrorPolicy = "rollback",
     name: Optional[str] = None,
 ) -> str:
-    """Run a multi-step pipeline of MCP tool calls in a single TCP round-trip.
+    """Run a multi-step pipeline of native TCP document commands in one round-trip.
 
     Each step has shape `{"tool": "<tool_name>", "args": {...}}`. The plugin
     executes them sequentially inside one Rhino undo record (so the whole
     batch is one Ctrl+Z step for the user) and applies the chosen
     `on_error` policy.
+
+    Resolve names through get_session_inventory's tcp_commands. Scripts, GH
+    operations, files, native command runners, nested batches and Undo/Redo
+    have their own transactions or external effects and must be separate calls.
+    Rollback covers this batch's Rhino document record only. Failed steps may
+    retain partial IDs in results[].result; completed means executed, not retained
+    after rollback. Stop preserves completed work and never triggers rollback.
 
     Parameters:
     - steps: ordered list of `{"tool": str, "args": dict}` entries.

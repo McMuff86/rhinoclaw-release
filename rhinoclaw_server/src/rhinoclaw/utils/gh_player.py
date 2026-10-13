@@ -19,6 +19,7 @@ import time
 from typing import Any, Dict, Optional
 
 from rhinoclaw.utils.door_batch import parse_point
+from rhinoclaw.utils.errors import ErrorCode, RhinoCommandError
 
 logger = logging.getLogger("rhinoclaw.gh_player")
 
@@ -114,14 +115,22 @@ def _rhino_file_exists(rhino, file_path: str) -> Optional[bool]:
 
 
 def _start_player(rhino, file_path: str) -> bool:
-    escaped_path = file_path.replace('\\', '\\\\')
-    code = (
-        "import Rhino\n"
-        f'cmd = \'_-GrasshopperPlayer "{escaped_path}"\'\n'
-        "Rhino.RhinoApp.SendKeystrokes(cmd + chr(13), True)\n"
-    )
+    """Start GrasshopperPlayer WITHOUT typing the command.
+
+    Rhino 9's SendKeystrokes drops characters in long strings
+    ('_-GrasshopperPlayer' arrived as '_-GrasshoppePlayer'), and partial
+    command-line input wedges the UI thread via the autocomplete popup —
+    both verified live 2026-08-17. The plugin's `start_script_async` runs
+    the macro via RhinoApp.RunScript on the UI thread instead (no typing)
+    and returns immediately. On Rhino 9 the player then shows its path
+    prompt with the macro argument as the default; the prompt loop answers
+    it with a plain Enter (empty value). On Rhino 8 the macro argument is
+    consumed directly and the first value prompt appears.
+    """
     try:
-        rhino.send_command('execute_rhinoscript_python_code', {'code': code})
+        rhino.send_command(
+            'start_script_async',
+            {'script': f'_-GrasshopperPlayer "{file_path}"'})
         return True
     except Exception as e:
         logger.error(f"Failed to start GrasshopperPlayer: {e}")
@@ -136,6 +145,32 @@ def _get_current_prompt(rhino) -> str:
 
 
 def _send_input(rhino, text: str) -> None:
+    """Answer a pending prompt with keystrokes.
+
+    Keystrokes are the only mechanism that feeds a pending getter on
+    Rhino 9 — RunScript-based `send_command_input` leaves the prompt
+    pending (verified live). Preferred channel is the plugin's dedicated
+    `send_keystrokes` command because it is dispatched WITHOUT an undo
+    record: routing keystrokes through `execute_rhinoscript_python_code`
+    opens that handler's own record while SendKeystrokes pumps the message
+    queue, which can interleave Begin/End with Rhino's command records and
+    leave a record dangling open — after which every later
+    BeginUndoRecord returns 0 and failed-script rollback silently stops
+    working (observed live 2026-08-17). Pre-0.7.7 plugins fall back to
+    the legacy rhinoscript path.
+    """
+    if getattr(rhino, '_rc_send_keystrokes_supported', None) is not False:
+        try:
+            rhino.send_command('send_keystrokes', {'text': text})
+            rhino._rc_send_keystrokes_supported = True
+            return
+        except RhinoCommandError as e:
+            if e.error_code != ErrorCode.UNKNOWN_COMMAND:
+                raise
+            rhino._rc_send_keystrokes_supported = False
+            logger.info(
+                "send_keystrokes not supported by this plugin — using the "
+                "legacy execute_rhinoscript fallback")
     escaped = text.replace('"', '\\"')
     code = f'import Rhino; Rhino.RhinoApp.SendKeystrokes("{escaped}" + chr(13), True)'
     rhino.send_command('execute_rhinoscript_python_code', {'code': code})
@@ -246,11 +281,15 @@ def run_player_for_door(rhino, file_path: str, params: Dict[str, Any],
             "WSL path."
         )
 
-    # Pre-load GH parameter metadata for smart prompt matching.
+    # Pre-load GH parameter metadata for smart prompt matching. Generous
+    # timeout: the FIRST Grasshopper load of a session initialises GH on
+    # the UI thread and takes well over the 15 s default (observed 2026-08-17
+    # on Rhino 9) — a short timeout here abandons the call while GH keeps
+    # blocking the UI anyway.
     gh_param_map: Dict[str, Dict[str, Any]] = {}
     try:
         meta = rhino.send_command('load_grasshopper_definition',
-                                  {'file_path': file_path})
+                                  {'file_path': file_path}, timeout=60.0)
         for p in (meta or {}).get('parameters', []):
             nick = (p.get('nickname') or p.get('name') or '').strip()
             if not nick:

@@ -1,10 +1,11 @@
 """Rhino integration through the Model Context Protocol."""
 
-__version__ = "0.7.2"
+__version__ = "0.8.2"
 
 # Expose key classes and functions for easier imports
 from .prompts.assert_general_strategy import asset_general_strategy
 from .server import RhinoConnection, get_rhino_connection, logger, mcp
+from .tools.get_operation_result import get_operation_result
 from .static.rhinoscriptsyntax import rhinoscriptsyntax_json
 from .tools.array_linear import array_linear
 from .tools.array_polar import array_polar
@@ -30,7 +31,9 @@ from .tools.create_text import create_text
 from .tools.create_text_dot import create_text_dot
 from .tools.delete_layer import delete_layer
 from .tools.delete_object import delete_object
+from .tools.session_inventory import get_session_inventory
 from .tools.deploy_gh_to_compute import deploy_gh_to_compute
+from .tools.ensure_layer_path import ensure_layer_path
 from .tools.erp_bridge import erp_invoke, erp_list_tools
 from .tools.execute_python3_code import execute_python3_code, get_script_capabilities
 from .tools.execute_rhinoscript_python_code import execute_rhinoscript_python_code
@@ -39,6 +42,7 @@ from .tools.export_mesh import export_mesh
 from .tools.extrude_curve import extrude_curve
 from .tools.fillet_curves import fillet_curves
 from .tools.find_gh_component import find_gh_component
+from .tools.find_library_part import find_library_part
 from .tools.find_nearby import find_nearby
 from .tools.find_objects import find_objects
 from .tools.get_auth_status import get_auth_status
@@ -46,6 +50,7 @@ from .tools.get_command_history import get_command_history
 from .tools.hello import hello
 from .tools.get_document_info import get_document_info
 from .tools.judge_door_placement import judge_door_placement
+from .tools.kit import kit_describe, kit_invoke, kit_list
 from .tools.get_logs import clear_logs, get_logs
 from .tools.get_object_info import get_object_info
 from .tools.get_objects_info import get_objects_info
@@ -96,8 +101,14 @@ from .tools.create_block import create_block
 from .tools.create_group import create_group
 from .tools.explode_block import explode_block
 from .tools.insert_block import insert_block
+from .tools.insert_library_part import insert_library_part
+from .tools.insert_rahmentuer import insert_rahmentuer
 from .tools.is_inside import is_inside
+from .tools.judge_part_placement import judge_part_placement
+from .tools.library_doctor import library_doctor
+from .tools.list_block_definitions import list_block_definitions
 from .tools.list_capabilities import list_capabilities
+from .tools.recall_part_placements import recall_part_placements
 from .tools.scene_summary import scene_summary
 from .tools.subscribe_events import subscribe_events
 from .tools.undo import undo
@@ -111,10 +122,17 @@ from .tools.get_grasshopper_outputs import get_grasshopper_outputs
 from .tools.inspect_grasshopper_definition import inspect_grasshopper_definition
 from .tools.list_grasshopper_definitions import list_grasshopper_definitions
 from .tools.load_grasshopper_definition import load_grasshopper_definition
+from .tools.grasshopper_canvas import (
+    attach_grasshopper_definition,
+    get_grasshopper_canvas,
+    show_grasshopper_definition,
+)
 from .tools.run_grasshopper import run_grasshopper
 from .tools.set_grasshopper_parameter import set_grasshopper_parameter
+from .tools.set_grasshopper_parameters import set_grasshopper_parameters
 from .tools.solve_grasshopper import solve_grasshopper
 from .tools.unload_grasshopper_definition import unload_grasshopper_definition
+from .tools.verify_gh_component_contract import verify_gh_component_contract
 from .tools.grasshopper_interactive import (
     run_door_script,
     run_grasshopper_interactive,
@@ -122,17 +140,57 @@ from .tools.grasshopper_interactive import (
 
 # VisualARQ BIM (graceful degradation without the plugin)
 from .tools.visualarq import (
+    va_add_rectangular_opening_size_profile,
+    va_add_building,
     va_add_level,
     va_create_door,
+    va_create_door_style,
+    va_create_slab,
+    va_create_slab_style,
+    va_create_space,
+    va_create_space_style,
+    va_create_window,
+    va_create_window_style,
     va_create_wall,
+    va_create_wall_style,
+    va_delete_style,
+    va_get_object,
+    va_get_style,
     va_ifc_export,
     va_ifc_import,
+    va_list_buildings,
     va_list_levels,
+    va_list_objects,
     va_list_styles,
+    va_rename_style,
     va_status,
+)
+from .tools.visualarq_bim import va_bim_snapshot, va_critique_bim
+from .tools.visualarq_persistence import va_validate_persistence_readiness
+from .tools.visualarq_documentation import (
+    va_documentation_capabilities,
+    va_create_plan_view,
+    va_create_section,
+    va_create_section_style,
+    va_create_section_view,
+    va_get_plan_view,
+    va_get_section,
+    va_get_section_view,
+    va_list_plan_views,
+    va_list_sections,
+    va_list_section_views,
+)
+from .tools.visualarq_roofs import (
+    va_create_roof_from_curve,
+    va_get_roof,
+    va_list_roof_styles,
+    va_list_roofs,
+    va_roof_capabilities,
 )
 
 # WebSocket Streaming (Real-Time Events)
+from .tools.grasshopper_artifacts import save_grasshopper_definition, capture_grasshopper_canvas
+
 from .tools.stream_commands import (
     cancel_rhino_command,
     clear_stream_buffer,

@@ -69,7 +69,7 @@ def place_doors(
         )
 
     Notes:
-        - Requires Grasshopper available in the running Rhino (`mcpstart`).
+        - Requires Grasshopper available in the running Rhino (server started via `ClawStart`).
         - Verify with `get_objects_info(ids)` / the upcoming
           `judge_door_placement`; the result's `baked_bbox` is the ground
           truth half of that loop.

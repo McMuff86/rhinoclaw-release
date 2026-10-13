@@ -12,12 +12,27 @@ class ErrorCode:
     CONNECTION_ERROR = "CONNECTION_ERROR"
     CONNECTION_TIMEOUT = "CONNECTION_TIMEOUT"
     CONNECTION_REFUSED = "CONNECTION_REFUSED"
+    OUTCOME_UNKNOWN = "OUTCOME_UNKNOWN"
+    SESSION_CHANGED = "SESSION_CHANGED"
+    IDEMPOTENCY_CONFLICT = "IDEMPOTENCY_CONFLICT"
+
+    # Protocol errors — mirrors the plugin's wire value for a command the
+    # dispatcher does not know (older plugin than the client expects).
+    # Used for capability probing, e.g. gh_player's send_keystrokes fallback.
+    UNKNOWN_COMMAND = "UNKNOWN_COMMAND"
 
     # Validation errors (2xx range conceptually)
     INVALID_PARAMS = "INVALID_PARAMS"
     MISSING_PARAMS = "MISSING_PARAMS"
     INVALID_TYPE = "INVALID_TYPE"
     INVALID_ID = "INVALID_ID"
+    UNSUPPORTED_OPERATION = "UNSUPPORTED_OPERATION"
+    AMBIGUOUS_REFERENCE = "AMBIGUOUS_REFERENCE"
+    ALREADY_EXISTS = "ALREADY_EXISTS"
+    RESOURCE_IN_USE = "RESOURCE_IN_USE"
+    PRECONDITION_FAILED = "PRECONDITION_FAILED"
+    VERIFICATION_FAILED = "VERIFICATION_FAILED"
+    PARTIAL_MUTATION = "PARTIAL_MUTATION"
 
     # Rhino errors (3xx range conceptually)
     RHINO_ERROR = "RHINO_ERROR"
@@ -53,15 +68,29 @@ class ErrorCode:
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
+class RhinoCommandError(Exception):
+    """A structured error response returned by the Rhino plugin."""
+
+    def __init__(
+        self,
+        message: str,
+        error_code: str = ErrorCode.RHINO_ERROR,
+        response: dict | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.error_code = error_code or ErrorCode.RHINO_ERROR
+        self.response = dict(response or {})
+
+
 def get_connection_error_code(exception: Exception) -> str:
     """Determine the appropriate error code based on exception type."""
     exc_str = str(exception).lower()
-    
+
     if "timeout" in exc_str:
         return ErrorCode.CONNECTION_TIMEOUT
     elif "refused" in exc_str or "connect" in exc_str:
         return ErrorCode.CONNECTION_REFUSED
     elif "connection" in exc_str:
         return ErrorCode.CONNECTION_ERROR
-    
+
     return ErrorCode.UNKNOWN_ERROR

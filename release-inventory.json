@@ -1,0 +1,823 @@
+{
+  "version": "0.8.2",
+  "source_commit": "819227960c08cfd0d7b57590daca2823ddd2e729",
+  "source_dirty": false,
+  "yak_sha256": "cc74868af7cb9bfefd49491cbfb210c5d6db023771eec9ce315437442a7cbd0e",
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 102902,
+      "sha256": "3550a7a173a70601d1662075e05ec5132bc8321f41101da37b9f6860c27f06de"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 11558,
+      "sha256": "1eb85fc97224598dad1852b5d6483bbcf0aa8608790dcc657a5a2a761ae9c8c6"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2463,
+      "sha256": "038a719ec5380a95df7840c30e0be4a3d2858179ced2d65f4e6bed247103cab0"
+    },
+    {
+      "path": "SECURITY.md",
+      "bytes": 7960,
+      "sha256": "97c79a0a32a25fa0568036b49d77ea9c5a6b320727f5646df698d5215b233564"
+    },
+    {
+      "path": "manifest.yml",
+      "bytes": 1386,
+      "sha256": "517c354097b2b89909e92a041c3f6f1e4f645cc947fdb24d6e80e2be386ede28"
+    },
+    {
+      "path": "packages/rhinoclaw-0.8.2-rh8_17-win.yak",
+      "bytes": 2992351,
+      "sha256": "cc74868af7cb9bfefd49491cbfb210c5d6db023771eec9ce315437442a7cbd0e"
+    },
+    {
+      "path": "rhinoclaw_server/README.md",
+      "bytes": 2793,
+      "sha256": "4edd58dabae740374075f672a030e182621f1fd5fe239377ffc8bdfd6e458fcc"
+    },
+    {
+      "path": "rhinoclaw_server/pyproject.toml",
+      "bytes": 2036,
+      "sha256": "a1ff8e6b6293feda6eee0d42164c88ebe44b58c41ea4231d9be4aed5b6d2bf04"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/__init__.py",
+      "bytes": 8853,
+      "sha256": "44776d7730fecb295bf463c8535ae21b2283d612164493ad797b1afa2c9a58a7"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/config.py",
+      "bytes": 5855,
+      "sha256": "8fc894e2b3a935f10885b6790176c038dc24e99a3f669b38bdcc5f26f4a676c3"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/logging_setup.py",
+      "bytes": 4385,
+      "sha256": "99f7e69159bbc49b20ea2ac22ea037e04458fcec8bf7ac0d8d8be9d59c016c70"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/prompts/assert_general_strategy.py",
+      "bytes": 1276,
+      "sha256": "2ac05a1b642e133d54773bc812b2e0640e985b6bb040bdcbee7603b8960315d1"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/server.py",
+      "bytes": 24873,
+      "sha256": "aa8b3bbc7d6fdbff94b8a7d1a37a1b3cff4ef29736bbaec9045ab643720b4bb0"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/static/gh_components.json",
+      "bytes": 3893305,
+      "sha256": "0b23168bc328432b49919503d347dca1a261dfa7146773fbec8d0eda66d0a84f"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/static/rhinoscriptsyntax.py",
+      "bytes": 1495128,
+      "sha256": "3ee06b44a3a9a84f5b9dda528e72a5859a1abc66c24753726bb46ea08f781ff6"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/add_light.py",
+      "bytes": 4416,
+      "sha256": "d478fc544a35fcf098d2a542985b7ab0f1398e22627e426b2cf12697427612d4"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/array_linear.py",
+      "bytes": 2413,
+      "sha256": "08e97ac11e125ce0a5725a1d4192b13e5a720b8bf5ae092ce74fc8ee9e85cfb7"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/array_polar.py",
+      "bytes": 2639,
+      "sha256": "b170d630df4e9c20de831b3ad12aa1e3fc2a4dc0b9110a27110e9e19a49ef5ae"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/assign_material_to_layer.py",
+      "bytes": 1052,
+      "sha256": "b2e43e4b1dc98c0089d0283340e719ea9ccb7a5b75b1c09657c57f43a379dc5d"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/bake_grasshopper.py",
+      "bytes": 12430,
+      "sha256": "a648e764df56e952a8a7afd12da95043f1dd34d77befa01694911daa8fbc19e8"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/batch_operations.py",
+      "bytes": 5141,
+      "sha256": "ff3ee295301bfa187708da9365c8197bd647699054ddeed15c89784f0125a2b9"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/boolean_operation.py",
+      "bytes": 3440,
+      "sha256": "43445e9ca8be018e7f913caf4e315203ce8d6de0316ec01d1bbfcbc19a38c2c5"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/build_and_bake_gh.py",
+      "bytes": 6200,
+      "sha256": "6d3fa7180b0d4a23f5e0eac50eac2ec07142c29ca12ae7bc399f556f73a9dc92"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/build_and_bake_recipe.py",
+      "bytes": 7987,
+      "sha256": "ef96e4ab71f5fb2d942fcc5007e09d09a87b09ece89aca5abaff97bda3723111"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/build_gh_definition.py",
+      "bytes": 6965,
+      "sha256": "90c239d2bd92a8908102bef9efaa0d77ffd1ba492e81b5a0e2f53306f5613b90"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/build_gh_interactive.py",
+      "bytes": 34630,
+      "sha256": "e01fcfae9d6dd34af6cfebc65f5498c31c6f83290aff22c5d8572d5dd9eea81c"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/capture_viewport.py",
+      "bytes": 4980,
+      "sha256": "2cecbae5ab25654a32f82835ab39a5da88dada1d42e4fa287b23e2a1104ee02f"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/chamfer_curves.py",
+      "bytes": 3310,
+      "sha256": "d4e721f9e6efe4bdf9a22868a33cde6d5de990e76e26cd171f7135aec1c85d55"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/check_setup.py",
+      "bytes": 8140,
+      "sha256": "44b6e6484782d265617b33a25b89d6685cf84ed68382b114e7a5e8e02854573f"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/copy_object.py",
+      "bytes": 1840,
+      "sha256": "fa720fcc04d6d45a64f76faf44bf770759d0ae6aa4f2245b0738f943842489a4"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_angular_dimension.py",
+      "bytes": 3098,
+      "sha256": "66d7b006cc2a1c3f7ad4204b79606c225cff008eac4255910388b5de3ac84794"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_block.py",
+      "bytes": 2201,
+      "sha256": "70c0fa1cce46594a99dce6071174277a19bc2bb7f4a035e02a2bec996731ff3f"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_group.py",
+      "bytes": 1842,
+      "sha256": "7fd7bc1040a398ee255874642285f74f3291ad7b7ce41de0267f5f6d8eb4f90c"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_layer.py",
+      "bytes": 1367,
+      "sha256": "8aa9be69ff3605cb476cd666d12e0730bebc36b15adc49ced04b7ac6a74f6928"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_leader.py",
+      "bytes": 1625,
+      "sha256": "65cffc7afe0d92fbac0379ec68d9efa18bd662a83df3f9ad7b40b7dea80e8037"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_linear_dimension.py",
+      "bytes": 2606,
+      "sha256": "626cb30913b7d3147831b3b1d4ec460af8a45f20e8760623471b6e297d47ef38"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_material.py",
+      "bytes": 1499,
+      "sha256": "8435fd7979878aebc0569f79fcdd770f664538fe7f438eaa7e69b1cd8de7c441"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_object.py",
+      "bytes": 6748,
+      "sha256": "fda79b24fe7e9dd74baed6892571f38b3743c03132d692b4cb42048ac53540ad"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_objects.py",
+      "bytes": 3164,
+      "sha256": "466c107c56278bfa6621fba7227f7e103a86c068e30e9ee90603228bf0a9dab4"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_radial_dimension.py",
+      "bytes": 2550,
+      "sha256": "08d80ae753400b15d5aee213840e4706e37662bd1bee5862fef5576b6443b549"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_text.py",
+      "bytes": 1520,
+      "sha256": "027c0d08c996c671bcc36c155fc2865fbc0c36ff97cba21a8b491950abcb6bb9"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/create_text_dot.py",
+      "bytes": 1440,
+      "sha256": "567dfd3ca331e6569ff5c3fc0e2e43deeea283cd61cb08dcd8dc6b80457748db"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/delete_layer.py",
+      "bytes": 1421,
+      "sha256": "949fb63d90bc9755d4a12cb4e738539ce5d6e16876673dd9b7e5356c552c70c5"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/delete_object.py",
+      "bytes": 1554,
+      "sha256": "ecf25ce3bfbbe5d00791e40762db6a9a527538f531615b443b9318634cd4154e"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/deploy_gh_to_compute.py",
+      "bytes": 14641,
+      "sha256": "972efff581f776441e353a2247d6b5d85077e7b2dee58d653fc1883fd5278412"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/ensure_layer_path.py",
+      "bytes": 6094,
+      "sha256": "760b8c8645a0ada68964376ab3af90f0f199fc170a94fc8b0f7bd50b88c54867"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/erp_bridge.py",
+      "bytes": 2672,
+      "sha256": "9b5d32ede06c74c9234d760ec8db56f112c3e48bf4ff12db8603b74dc2defcd0"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/execute_python3_code.py",
+      "bytes": 5472,
+      "sha256": "bb1b2ce255450d89c05d131a60fe865c8185b1f15213701992f8ad7e5d798456"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/execute_rhinoscript_python_code.py",
+      "bytes": 2019,
+      "sha256": "91e375de06c0697c57d50b6fe026177fd2bf4f21dfa33db78d9f978f5f3bdf83"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/explode_block.py",
+      "bytes": 1743,
+      "sha256": "f596f0887770f8da3ea4ca94519bebe73583766cf9f1842ceb7b8a3e3f5de3cc"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/export_file.py",
+      "bytes": 3217,
+      "sha256": "6b339318e08a8531122107a293bad0bf2e5bbcac73823bc4c8022bcfc521117f"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/export_mesh.py",
+      "bytes": 2489,
+      "sha256": "ef424f540e6001c17819d1f6c254e18d76f170721439ad88669c28f487e95a7f"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/extrude_curve.py",
+      "bytes": 2847,
+      "sha256": "fad320e998f73bcefd0fb1689e8eb2a50ebef02016f9314ef8a878d920b541bf"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/fillet_curves.py",
+      "bytes": 2528,
+      "sha256": "2e2b81030ad1a93128d8113956dc19a1b077c22dcbb327f3f5852ebca57ddf58"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/find_gh_component.py",
+      "bytes": 6429,
+      "sha256": "42f52c12d81fb144669abcdbe19ab673febb62411b68b683453159af1eeba969"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/find_library_part.py",
+      "bytes": 4284,
+      "sha256": "51ec214c8c6853937577aca204d32b0e2620e9af06143ece7861a629322f2701"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/find_nearby.py",
+      "bytes": 2495,
+      "sha256": "224aeff2b5ea7400fbb3c4f7523fb7b5d4014e77d21ad4bd67323979d5d286e0"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/find_objects.py",
+      "bytes": 4129,
+      "sha256": "3872f1e6c414345e07c2dee85017c0fb1aa366c129ce9e840af38ded850c7a9a"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_auth_status.py",
+      "bytes": 3249,
+      "sha256": "3e4cd1cd709f1cc38df3145689515c554398abf3d4667f2da459f5c4a79b40db"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_command_history.py",
+      "bytes": 1711,
+      "sha256": "483f03fc7941cb3e954c8eac9384b0baf13dab95459dc9542acb64932a284322"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_document_info.py",
+      "bytes": 1089,
+      "sha256": "c78854c15ce536a2126093215e52cd88e148991a3d0b6e17c4555c6d53852592"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_grasshopper_outputs.py",
+      "bytes": 6350,
+      "sha256": "641ad1fa740145e0d9ef7d4a039254d58f1e0341119a64ba58848e544c6d14ec"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_logs.py",
+      "bytes": 1747,
+      "sha256": "656a18f48ce43229f335908b99a8692211d2fac1375ab7afa32915572a00ac78"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_object_info.py",
+      "bytes": 1344,
+      "sha256": "9489a6de2830d45bfc21e728abb3abc1dfac246a204de8a0fb080ea050841bdb"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_object_properties.py",
+      "bytes": 2329,
+      "sha256": "4998a0f15c52713642973ff7c8af79cb210d97da5e21487048126398430758ca"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_objects_info.py",
+      "bytes": 2225,
+      "sha256": "e72d41e599fccdefce9fdee2b3efc3e38afb42561f50ad01b153c7d6f1a6acd4"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_operation_result.py",
+      "bytes": 1990,
+      "sha256": "b0db208c24a7c3656e67f5f9bcff678b70437599723ec53088ab2f575429e566"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_or_set_current_layer.py",
+      "bytes": 1554,
+      "sha256": "f98d1d9f117fcbd5aa6050869f6ec6e0e05e78bbfc9910bf7372bc7b932bbb1e"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_relationships.py",
+      "bytes": 2661,
+      "sha256": "15210f0daf4be26f6a2274fc429ed1935acaea05f277f42e3cf377d9fc284a50"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_rhinoscript_python_code_guide.py",
+      "bytes": 931,
+      "sha256": "8402a45900d9298d6dece112e0964f6d97ba970836e9cce6052cadac547c3e6c"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_rhinoscript_python_function_names.py",
+      "bytes": 1389,
+      "sha256": "90b84746b8dc5dbd0582e8fd13684baefca66e77f071da50010186ba6b6cae1a"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_selected_objects_info.py",
+      "bytes": 884,
+      "sha256": "cac327646368d4f2cc5bb4954b2d862a453f2594cc86036dccb7d566cf5cc03b"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_session_stats.py",
+      "bytes": 2706,
+      "sha256": "e32d7ec83a8a6b6eb625c03ab04601d03f9f28f0562ea46d977f3d19d1a2169b"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/get_ui_state.py",
+      "bytes": 9040,
+      "sha256": "252cf9b08def9e24c7d8b6de226afc283d1f5b0216b85d1bb627bbf5b20ddca0"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/grasshopper_artifacts.py",
+      "bytes": 3242,
+      "sha256": "21899161223b96bf1fca41b5bda0e6c3d1ce46ab669d75cc2f480d0ed0dd0ebb"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/grasshopper_canvas.py",
+      "bytes": 9326,
+      "sha256": "34cc075ff27973d5514ede5958937e43df27a76eab3b393d3a3e7d1cfe399cfe"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/grasshopper_interactive.py",
+      "bytes": 12366,
+      "sha256": "05c78ff4d6f158b7fb5e0630b20e2a96043a3770a8061a09f1f32dc114b98eb7"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/hello.py",
+      "bytes": 1981,
+      "sha256": "dd35d2ed4552c268ec373a5105bbd5a060b2b43ef1ec1c26346db16c68c9d190"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/import_mesh.py",
+      "bytes": 2554,
+      "sha256": "eed58cfc9e8a8e8b1a726372ac90200166e2d5e85e0e4ef08689a43e2f8d12a0"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/insert_block.py",
+      "bytes": 2564,
+      "sha256": "7133396848cc43f59955c07c3126e0a6cc66179411686ec00ea7308f866d1945"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/insert_library_part.py",
+      "bytes": 5993,
+      "sha256": "198e148f51ca26dd71d4153dea790568addfc6adf3c81341350461fd3f52804b"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/insert_rahmentuer.py",
+      "bytes": 11257,
+      "sha256": "13394b96e17a507aa514164cecf86850a96fd202260081786d777b2409f722f1"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/inspect_grasshopper_definition.py",
+      "bytes": 4551,
+      "sha256": "5b55574cdae0bef8fa190c15186c5682ee1eb0d10e60d457e5574a2094a0e141"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/is_inside.py",
+      "bytes": 2453,
+      "sha256": "55b2a1403bf60c9fea3cd911841976dda23f6259e1e76ed0ab715345c958c44e"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/judge_door_placement.py",
+      "bytes": 9682,
+      "sha256": "8ea9d76841926e0060071f6eeefcc49de87b56808fcccd7bcf5ff5ded9dcfb7b"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/judge_part_placement.py",
+      "bytes": 9874,
+      "sha256": "20bb13b14d0f134a24d25c77e0ccaf0b7c40342fb6d0eb8ed4804677d3f25c01"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/kit.py",
+      "bytes": 6401,
+      "sha256": "0877668d5646f4b2a07db9de4c37f5239e32f69550ae36df968ce82a9e15db37"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/library_doctor.py",
+      "bytes": 10260,
+      "sha256": "9ec1d12cbc4ccf19b6f996e79720e6451399e0a2e58477f3aaea90946c2cbb9e"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/list_block_definitions.py",
+      "bytes": 2483,
+      "sha256": "8af7f2bf4c36af1a8ddf4c7b351e022b03f908570aa60fbd6a99a7d205675439"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/list_capabilities.py",
+      "bytes": 2045,
+      "sha256": "412524968477e28dd4c7b7a48efc1b590d66606943fd0a8736ad0ffee5f7ae62"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/list_grasshopper_definitions.py",
+      "bytes": 2481,
+      "sha256": "3dacd67367642296c3311a672324db46a3ed833750dba13213008232b2d28bfb"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/load_grasshopper_definition.py",
+      "bytes": 7408,
+      "sha256": "4dd2ed576d7e8138b88e522acef966d66b5b02716fdc056870f72521e1973a25"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/loft_curves.py",
+      "bytes": 2477,
+      "sha256": "63086999d6b1f7bfc289e67422e500909bf59576c541fbea5e821c5f7d909acf"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/log_thought.py",
+      "bytes": 650,
+      "sha256": "badb7c906dc0110a6377d0f6d149e0d20d53bf2cf0b64efd27ee0a1f1a53d2b0"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/mesh_from_brep.py",
+      "bytes": 2356,
+      "sha256": "9231ae34d01855dad64221aa517926f9fb333f0f8644c299c09e121befc16403"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/mirror_object.py",
+      "bytes": 2300,
+      "sha256": "eac7a3dc82c0dd229e523a75bb15015b5711ff1bebdebc7cd23d7ba9f9934a1d"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/modify_object.py",
+      "bytes": 2549,
+      "sha256": "1251434d6b72d18c151871b45b761f33812a4a82ab6981145b5cd30aac3d5990"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/modify_objects.py",
+      "bytes": 1688,
+      "sha256": "b802a5078636fdbe59513392338622f521f67fa4a834ba57a66dce9840af535d"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/offset_curve.py",
+      "bytes": 2656,
+      "sha256": "a0e4ae82f701b54cda3e855d5bd157a0c131d4c816b5796b2f28344bfd2a7976"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/open_file.py",
+      "bytes": 2134,
+      "sha256": "bbdbdf4d91d2359682695ff698085750fe1bceb599842ec45cbe7cea67f1ff08"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/orbit_camera.py",
+      "bytes": 2927,
+      "sha256": "f0aeec67df77266cbb3abcc3d65c4523f1f4e5f600da35d9a4963013ac0190bb"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/ping.py",
+      "bytes": 758,
+      "sha256": "fbfa11e750606d0b6d48383325b7a7f6ba801c3d9ea9c56191d9b22ef553a7eb"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/place_doors.py",
+      "bytes": 5116,
+      "sha256": "fcbb43e573ad931f98a177d03281412d380cb8174a7510f3475787c294afa1a9"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/preflight.py",
+      "bytes": 6479,
+      "sha256": "83fe3588631bdb5ed52dc4329f2151bec32d103e4f97758515bbf70a9ccb96dc"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/recall_part_placements.py",
+      "bytes": 3563,
+      "sha256": "9ecefedc853838cda715ec81ddd24db693b7e2c07b4440e3267170d17fb1c06d"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/recall_placements.py",
+      "bytes": 3439,
+      "sha256": "1b2f45b884e807d6c05d75eb0bdead0be170beb32fa281af5e2aeab05579b193"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/redo.py",
+      "bytes": 1581,
+      "sha256": "dd10d7f9283de868859f60d5ae08534b5cf551aacd60b1e88154b53e5ea1c03e"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/render_view.py",
+      "bytes": 4601,
+      "sha256": "cb97ab5039b5ca83a242548d4fdb4f5700e5246874b949023eba755797ba87b5"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/revolve_curve.py",
+      "bytes": 2922,
+      "sha256": "c0846876dae558a7d0bc7dc1c47fb96fb8825cd9f7365e07c69581c79a9be93b"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/run_grasshopper.py",
+      "bytes": 1842,
+      "sha256": "d93205054a93130f6df5079adbabb8b8383b1759a346cbee8ba465ba2208a009"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/run_native_command.py",
+      "bytes": 2397,
+      "sha256": "ce5ef2826d87beddadca68f04bfbabb64d5d91d210a74f56a32538503bafd194"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/save_file.py",
+      "bytes": 2632,
+      "sha256": "aec7895b804b62f69d8a2d3fccefcd37b31b570c1620ac1bff0c1f8e6c874868"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/scene_summary.py",
+      "bytes": 1811,
+      "sha256": "7d5bc36ca63be5c721c16201513c37811c7844fd74e2c21702e5aab0481dc012"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/select_objects.py",
+      "bytes": 2329,
+      "sha256": "641343293ffd2267709fb18c0695242a2bb529c9efa920c552c58b452c1a3ede"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/session_inventory.py",
+      "bytes": 3177,
+      "sha256": "c7f09d6ebd31603278cd26c4912133aef1464ec8f69c417e70e115d797482224"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/set_camera.py",
+      "bytes": 2612,
+      "sha256": "59e53d45e250d3cc86969ec91a3fc9e839767c7fa20f5ac33f890161c42cfb51"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/set_debug_mode.py",
+      "bytes": 774,
+      "sha256": "785d07866376e23de185b23ddc73b1a6b820bdf048214d1e4ae93346ea94a778"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/set_grasshopper_parameter.py",
+      "bytes": 3601,
+      "sha256": "7bee3b2fa831fb7c58d342975ab4e3bd70dc2a1b0315f0610e19ff1571ac6866"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/set_grasshopper_parameters.py",
+      "bytes": 6816,
+      "sha256": "8e9e7e0b74581807a446a9a48a92d17bfa1031760c545539734da6ae68ffb019"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/set_object_properties.py",
+      "bytes": 3215,
+      "sha256": "22a822676679dd93b346d1294aeb976bf1ed5671ad640dc4ba06eece2b2606e0"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/set_render_settings.py",
+      "bytes": 2913,
+      "sha256": "2efee3611c54f1a2c2abc6c6cb8730a02e0fd166356ec66c93739fc207b8a2e8"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/set_view.py",
+      "bytes": 2030,
+      "sha256": "24a573106efe7894189ab97013e67aa95a5220772fbd5820762ba45470d037cc"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/solve_grasshopper.py",
+      "bytes": 6926,
+      "sha256": "30fe688cd66da35f7e50a26432f5009ec35c60aececb527fe313a039716d1ec9"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/stream_commands.py",
+      "bytes": 16755,
+      "sha256": "f9191e107c669cc41e45ebe50d71b94e482d4e2f305cfad0735a683f7b83e1b3"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/subscribe_events.py",
+      "bytes": 4742,
+      "sha256": "065055d56853971f13faadada71c5b10a4308ceec90de1593a1e26c67213e3b6"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/undo.py",
+      "bytes": 2648,
+      "sha256": "8d6fb179b0fbaebbcea0e60ea67c64cd574090c9683a109a3471f9dfec4ac754"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/ungroup.py",
+      "bytes": 1755,
+      "sha256": "46bf9099c835c74db0d3f463734038c155ad74dc1633fe512fde0596087e780b"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/unload_grasshopper_definition.py",
+      "bytes": 2910,
+      "sha256": "46386c17d3f431e433f83cff772ca6b46ad80d0bd1878e160675fd6e3a893e47"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/validate_gh_definition.py",
+      "bytes": 2591,
+      "sha256": "40d6e8b342dbc4f69937b7902feb5b82c4f9b7cbd7f4080c05f16360647cf02b"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/verify_gh_component_contract.py",
+      "bytes": 18369,
+      "sha256": "1ba3d2b4a5503ab4fb3c5ef1b1d63f67ee2ba31df633d93484254651155c5ec4"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/visualarq.py",
+      "bytes": 565952,
+      "sha256": "06f190a7879938676af18ed7467a9f67c87edd2ab29a95d677f48df581a9d33e"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/visualarq_bim.py",
+      "bytes": 42370,
+      "sha256": "95346d07e56b89d122271b8c06e28f30c3361b7f61832c733d87da5152dc4f6f"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/visualarq_documentation.py",
+      "bytes": 37190,
+      "sha256": "8938489bb45d28ba97e0fd410710834adad719d9db6daf95eee689211d00575b"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/visualarq_persistence.py",
+      "bytes": 35837,
+      "sha256": "0d9255ba5c1f7c1dd2f7cf0721af3179f6aba0ec119c8b409372401393e72aa4"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/visualarq_roofs.py",
+      "bytes": 26669,
+      "sha256": "b4e3685e7c791d105d9549f8c64c479217668339fb8468a5348a5adaac56d1fc"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/wait_for_object_event.py",
+      "bytes": 4241,
+      "sha256": "52c1e58c7f92ba54f16458ba82d23e8600157d0549b06896ad67552a1a87750b"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/zoom_extents.py",
+      "bytes": 1590,
+      "sha256": "6eb8b1da1dd053cd26beb81c6425e013ce0e3cf849a113cd184ee7b4e46024df"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/tools/zoom_selected.py",
+      "bytes": 1822,
+      "sha256": "d117c5bcb8c1d1187c4cc9d6bfb8df141a439a7ff51c133e68582f30a82d40a6"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/transport/wire.py",
+      "bytes": 8539,
+      "sha256": "9ce268d26d9a0af75c56877d5fda2b25a5e8c4d3514045297c2bb04cf4365775"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/door_batch.py",
+      "bytes": 6165,
+      "sha256": "777ec0f0808c8d0744f8950cddbe214ddbc1236406b3a329280e8d193612ae09"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/door_judge.py",
+      "bytes": 6567,
+      "sha256": "300b71f148fd13380dd7c95dd271e1df8469cefea070bebc3c7ad7881284103d"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/errors.py",
+      "bytes": 3469,
+      "sha256": "81cae253614b34aad5e2e0a634a2e134c10432967c3aec8885e7f44a0a17ec63"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/gh_bake_verification.py",
+      "bytes": 16172,
+      "sha256": "d1fc1256f323753b644d58732dbacc5f88c6454844199afa02620af3fbda0677"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/gh_bim_verification.py",
+      "bytes": 6131,
+      "sha256": "b53cc5a28d95777fe75925d041ef7a4fb4c77de0027fec3fa462a01274dbde73"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/gh_catalog.py",
+      "bytes": 16951,
+      "sha256": "168ebcd8230ef1e45acb6300465fe1131a3224d1af26ea190f57d0aaafa2d866"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/gh_critic.py",
+      "bytes": 20778,
+      "sha256": "b5685888f54c90ab67f50195a8e4d0097a71bc28121e7338820e44e98306507d"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/gh_lint.py",
+      "bytes": 11740,
+      "sha256": "17ff8978622c09a175c885bc1945ac9e6fca778bf2175028e5df4ca374b699e8"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/gh_output_targets.py",
+      "bytes": 1719,
+      "sha256": "c5021b7fa391442aa78094eacc5e4bf97f4a48f12781e1d3e643e9652035aa33"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/gh_player.py",
+      "bytes": 17687,
+      "sha256": "0e0836ac51fd1e204b1820a79d84142adba3f82bbdf9b964b9a9dcb483619d0a"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/gh_recipes.py",
+      "bytes": 9629,
+      "sha256": "4351c32e36bb85677bf6ebfa1be8e1bfb92f12a8b6d84198451cbe72817268eb"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/image_storage.py",
+      "bytes": 8881,
+      "sha256": "cabdd0d42aa93569712fb7c2ff25c8ce16546acc584c469ddc7a0684a24eab9b"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/interaction_logger.py",
+      "bytes": 13795,
+      "sha256": "e4cb9f1abf4296c8d825399f915e8ce05dccecdca589e879b60dbd8b75b6c312"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/kits.py",
+      "bytes": 12999,
+      "sha256": "643627baf6cee372c0a5df2f23ec8d16f2670216846bf16b8ab8800c1a2bd30a"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/part_judge.py",
+      "bytes": 10938,
+      "sha256": "ba8841bf61637206c4ddd7c3503e9b31f44a80e132e05caa8797a8aa3617b1ea"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/part_library.py",
+      "bytes": 6981,
+      "sha256": "5981694b03c369989dccc04d325e18f3ed6f9b8096df9d1e106f8aaf9987ed7f"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/part_math.py",
+      "bytes": 4975,
+      "sha256": "812e13ead57dd4dd062fce936b7e2af0706e2a8076a1ae10d469f3abdfe19d12"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/part_recipe_distiller.py",
+      "bytes": 4284,
+      "sha256": "93987eca17fdd3b8d61a8860b2c5687289d99bc9a5fa44ede7da6b21cee1fa89"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/rahmentuer.py",
+      "bytes": 9432,
+      "sha256": "653799d1a1134a3088fb22b2d7c6e324a3b3241323f55d621b2d0c92a3c592bd"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/recipe_distiller.py",
+      "bytes": 4339,
+      "sha256": "03ca1f174ad17230a71113db80bd2b3a12e5508e541945ab74c5e1b1452a9e4c"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/responses.py",
+      "bytes": 1998,
+      "sha256": "ec7a0223ea0995a919e4a5970f4adc0b4f0181971e313df032b407dcae80c439"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/viewports.py",
+      "bytes": 2348,
+      "sha256": "57ed452c0aa3975b23f7efa98759d29b2594e58cfe2bd6b46fe71bf701e0a15a"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/utils/visualarq.py",
+      "bytes": 12854,
+      "sha256": "d765e54a1dbed5a2cb72010ff2b9ac8d961e661e5b0b0febc777a2c97136bc46"
+    },
+    {
+      "path": "rhinoclaw_server/src/rhinoclaw/websocket_client.py",
+      "bytes": 33291,
+      "sha256": "be4005088d2da23cb7328a3ff35245c2e52f545453de5d2ce131924d6f327e97"
+    }
+  ]
+}

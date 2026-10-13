@@ -1,3 +1,5 @@
+from rhinoclaw.utils.responses import from_exception, from_result
+import json
 from typing import List, Optional
 
 from mcp.server.fastmcp import Context
@@ -28,7 +30,7 @@ def create_material(ctx: Context, name: str, color: List[int], shine: Optional[f
             "roughness": roughness
         }
         result = rhino.send_command("create_material", command_params)
-        return f"Created {material_type} material: {result['message']}"
+        return json.dumps(from_result(result, message="Material created"))
     except Exception as e:
         logger.error(f"Error creating material: {str(e)}")
-        return f"Error: {str(e)}"
+        return json.dumps(from_exception(e))

@@ -87,9 +87,38 @@ def get_ui_state(ctx: Context, timeout: float = 10.0) -> str:
                 },
             ))
 
-        text = raw if isinstance(raw, str) else (raw or {}).get("result", "")
+        raw_dict: Dict[str, Any] = raw if isinstance(raw, dict) else {}
+        text = raw if isinstance(raw, str) else raw_dict.get("result", "")
         if isinstance(text, str) and text.startswith(_PRINT_PREFIX):
             text = text[len(_PRINT_PREFIX):]
+        if "STATE:" not in str(text):
+            # The probe script did not run (or printed nothing). Seen live
+            # 2026-10-06: the document's undo state was stuck, the plugin
+            # refused the script with "Undo recording unavailable:
+            # undo_redo_active", and this tool crashed with IndexError exactly
+            # when its diagnosis was needed. Report the refusal as the state.
+            reason = str(raw_dict.get("message") or text or "probe returned no output").strip()
+            undo_stuck = "undo" in reason.lower()
+            return json.dumps(ok(
+                message="Rhino UI probe could not run — treat as busy",
+                data={
+                    "busy": True,
+                    "modal_dialog_open": None,
+                    "in_command": None,
+                    "command_stack": [],
+                    "command_prompt": None,
+                    "probe_error": reason,
+                    "diagnosis": (
+                        f"The probe script did not run: {reason}. "
+                        + ("The document's undo/redo state is stuck; no "
+                           "mutating call will succeed until it is cleared "
+                           "(native Undo/Redo in Rhino, or restart Rhino)."
+                           if undo_stuck else
+                           "Check the Rhino screen for a dialog or a running "
+                           "command; see get_command_history.")
+                    ),
+                },
+            ))
         state: Dict[str, Any] = json.loads(
             str(text).split("STATE:", 1)[1].strip().splitlines()[0])
 

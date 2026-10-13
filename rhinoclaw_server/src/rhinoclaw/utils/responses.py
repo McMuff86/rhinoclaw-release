@@ -20,6 +20,14 @@ def error(
     return body
 
 
+def from_result(result: Any, message: str = "") -> Dict[str, Any]:
+    """Normalize a native result without turning a reported failure into success."""
+    if isinstance(result, dict) and (result.get("success") is False or result.get("status") in {"error", "failed"}):
+        return error(result.get("message", "Rhino reported failure"),
+                     code=result.get("error_code", ErrorCode.RHINO_ERROR), data=result)
+    return ok(message=message, data=result)
+
+
 def from_exception(
     exc: Exception,
     code: Optional[str] = None,
@@ -27,17 +35,19 @@ def from_exception(
 ) -> Dict[str, Any]:
     """
     Create an error response from an exception.
-    
+
     Args:
         exc: The exception to convert
-        code: Explicit error code (takes precedence)
+        code: Explicit fallback code for exceptions without a structured code
         auto_detect: If True and no code provided, attempt to detect code from exception
     """
-    if code is None and auto_detect:
+    structured_code = getattr(exc, "error_code", None)
+    if isinstance(structured_code, str) and structured_code:
+        code = structured_code
+    elif code is None and auto_detect:
         code = get_connection_error_code(exc)
     elif code is None:
         code = ErrorCode.UNKNOWN_ERROR
-    
-    return error(str(exc), code=code)
 
-
+    details = getattr(exc, "response", None)
+    return error(str(exc), code=code, data=details if isinstance(details, dict) and details else None)

@@ -48,7 +48,7 @@ def preflight(ctx: Context) -> str:
     - `missing_client_token` / `token_mismatch` → CONFIG error, do NOT retry;
       fix RHINOCLAW_AUTH_TOKEN (same value both sides) + restart Rhino.
     - `blocked` → respect the cooldown (`blocked_until`); do NOT retry.
-    - `unknown` (not connected) → start Rhino + `tcpstart`; on WSL check
+    - `unknown` (not connected) → start Rhino + `ClawStart` / `ClawTcpStart`; on WSL check
       RHINOCLAW_HOST.
     """
     settings = get_settings()
@@ -61,8 +61,8 @@ def preflight(ctx: Context) -> str:
     except Exception as e:
         return _verdict(
             False, "unknown",
-            f"Plugin not reachable at {host}:{port}. Start Rhino + run `tcpstart` "
-            f"(or `mcpstart`); on WSL check RHINOCLAW_HOST.",
+            f"Plugin not reachable at {host}:{port}. Start Rhino + run `ClawStart` "
+            f"(local) or `ClawTcpStart` (remote), or enable `ClawAutoStart`; on WSL check RHINOCLAW_HOST.",
             host=host, port=port, detail=str(e),
         )
 

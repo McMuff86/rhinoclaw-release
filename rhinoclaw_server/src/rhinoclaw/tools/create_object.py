@@ -72,6 +72,10 @@ def create_object(
     - width: Width of the box along X axis of the object
     - length: Length of the box along Y axis of the object
     - height: Height of the box along Z axis of the object
+    These are FULL dimensions. BOX is centered at the origin before transforms:
+    bounds are [-width/2, -length/2, -height/2] to [width/2, length/2, height/2].
+    For a lower corner [x, y, z], pass translation=[x+width/2, y+length/2, z+height/2].
+    Example: 400 x 200 x 100 from [0,0,0] needs translation=[200,100,50].
 
     For SPHERE, the params dictionary should contain the following key:
     - radius: Radius of the sphere

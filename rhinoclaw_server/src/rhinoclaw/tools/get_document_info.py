@@ -9,7 +9,13 @@ from rhinoclaw.utils.responses import from_exception, ok
 
 @mcp.tool()
 def get_document_info(ctx: Context) -> str:
-    """Get detailed information about the current Rhino document"""
+    """Get detailed information about the current Rhino document.
+
+    ``object_count`` counts active, non-phantom model objects and matches the
+    scope of the returned ``objects`` sample. ``object_table_count`` is the
+    lower-level Rhino table count and can additionally include plugin-owned
+    phantom entries (for example VisualARQ document state).
+    """
     try:
         rhino = get_rhino_connection()
         result = rhino.send_command("get_document_info")

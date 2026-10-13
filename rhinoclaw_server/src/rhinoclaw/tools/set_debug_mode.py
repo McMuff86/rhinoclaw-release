@@ -1,3 +1,5 @@
+from rhinoclaw.utils.responses import from_exception, from_result
+import json
 from mcp.server.fastmcp import Context
 
 from rhinoclaw.server import get_rhino_connection, logger, mcp, set_debug_mode
@@ -10,8 +12,8 @@ def set_debug_mode_tool(ctx: Context, enable: bool) -> str:
         set_debug_mode(enable)
         # Also send command to Rhino to set debug mode there
         rhino = get_rhino_connection()
-        rhino.send_command("set_debug_mode", {"enable": enable})
-        return f"Debug mode {'enabled' if enable else 'disabled'}"
+        result = rhino.send_command("set_debug_mode", {"enable": enable})
+        return json.dumps(from_result(result, message="Debug mode updated"))
     except Exception as e:
         logger.error(f"Error setting debug mode: {str(e)}")
-        return f"Error: {str(e)}"
+        return json.dumps(from_exception(e))

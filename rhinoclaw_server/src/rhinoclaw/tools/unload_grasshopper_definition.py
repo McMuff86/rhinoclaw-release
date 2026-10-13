@@ -30,7 +30,7 @@ def unload_grasshopper_definition(
     Returns:
         JSON object containing:
         - definition_id: The unloaded definition ID
-        - status: "unloaded" on success
+        - status: "unloaded", or "released" when a presented graph is retained
     
     Example:
         >>> # Complete workflow with cleanup
@@ -47,6 +47,8 @@ def unload_grasshopper_definition(
     
     Notes:
         - The definition_id becomes invalid after unloading
+        - Graphs shown to the user remain open and editable; only the agent
+          handle is released. Close/save them explicitly in Grasshopper.
         - Multiple definitions can be loaded simultaneously
         - Use list_grasshopper_definitions to see loaded definitions
     
@@ -68,7 +70,9 @@ def unload_grasshopper_definition(
         })
 
         return json.dumps(ok(
-            message=f"Unloaded Grasshopper definition: {definition_id}",
+            message=(f"Released agent handle; graph retained in Grasshopper: {definition_id}"
+                     if result.get("status") == "released" else
+                     f"Unloaded Grasshopper definition: {definition_id}"),
             data=result
         ))
     except Exception as e:

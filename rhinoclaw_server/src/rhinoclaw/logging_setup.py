@@ -24,6 +24,24 @@ if TYPE_CHECKING:
     from rhinoclaw.config import Settings
 
 
+def _redact(text: str) -> str:
+    # Redact the configured secret even when an exception or third-party
+    # logger includes it, including JSON-escaped variants in structured logs.
+    from rhinoclaw.config import get_settings
+
+    token = get_settings().auth_token
+    if token:
+        variants = {token}
+        # A JSON response inside a log message is escaped again by the JSON
+        # formatter. Cover both levels, including mixed Unicode encodings.
+        for _ in range(2):
+            variants.update(json.dumps(value, ensure_ascii=ascii_only)[1:-1]
+                            for value in tuple(variants) for ascii_only in (True, False))
+        for value in sorted(variants, key=len, reverse=True):
+            text = text.replace(value, "[REDACTED]")
+    return text
+
+
 # Fields that the stdlib LogRecord always carries; everything else on the
 # record dict is treated as user-supplied "extra" metadata and merged into
 # the structured payload.
@@ -56,7 +74,7 @@ class _JsonFormatter(logging.Formatter):
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
 
-        return json.dumps(payload, ensure_ascii=False)
+        return _redact(json.dumps(payload, ensure_ascii=False))
 
 
 class _TextFormatter(logging.Formatter):
@@ -71,8 +89,8 @@ class _TextFormatter(logging.Formatter):
         base = super().format(record)
         request_id = getattr(record, "request_id", None)
         if request_id:
-            return f"{base} [req={request_id}]"
-        return base
+            return _redact(f"{base} [req={request_id}]")
+        return _redact(base)
 
 
 def _build_handler(log_format: str) -> logging.Handler:

@@ -31,10 +31,11 @@ def boolean_operation(
     Notes:
     - All objects must be closed solids (Breps)
     - For DIFFERENCE, the first object_id is the base from which others are subtracted
+    - Every result inherits attributes (layer/name/color/material) from the first input
+    - Inputs are deleted only after every result addition has passed native readback
+    - Partial failures retain exact result/deleted/remaining input IDs; inspect before retrying
     """
     try:
-        rhino = get_rhino_connection()
-        
         operation_upper = operation.upper()
         if operation_upper not in ["UNION", "DIFFERENCE", "INTERSECTION"]:
             return json.dumps(from_exception(
@@ -47,6 +48,9 @@ def boolean_operation(
                 ValueError("At least 2 object IDs are required for boolean operations"),
                 code=ErrorCode.INVALID_PARAMS
             ))
+        if len(set(object_ids)) != len(object_ids):
+            raise ValueError("Boolean inputs must have distinct object IDs")
+        rhino = get_rhino_connection()
         
         result = rhino.send_command("boolean_operation", {
             "operation": operation_upper,
@@ -54,7 +58,13 @@ def boolean_operation(
             "delete_input": delete_input
         })
 
-        # Extract the first result ID for single-result operations
+        if result.get("success") is False:
+            response = from_exception(RuntimeError(result.get("message", "Boolean operation failed")),
+                                      code=result.get("error_code", ErrorCode.RHINO_ERROR))
+            response["data"] = result
+            return json.dumps(response)
+
+        # Preserve ownership/verification evidence alongside the convenience ID.
         result_ids = result.get("result_ids", [])
         if not result_ids:
             return json.dumps(from_exception(
@@ -64,7 +74,7 @@ def boolean_operation(
 
         return json.dumps(ok(
             message=f"Boolean {operation_upper} completed",
-            data={"id": result_ids[0], "result_ids": result_ids}
+            data={**result, "id": result_ids[0], "result_ids": result_ids}
         ))
     except Exception as e:
         logger.error(f"Error performing boolean operation: {str(e)}")

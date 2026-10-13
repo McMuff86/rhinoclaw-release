@@ -84,7 +84,7 @@ async def run_grasshopper_interactive(
                     data={
                         "success": False,
                         "error": "WebSocket connection failed",
-                        "hint": "Make sure Rhino is running with mcpstart"
+                        "hint": "Make sure Rhino is running with the RhinoClaw server started (ClawStart)"
                     }
                 ))
         

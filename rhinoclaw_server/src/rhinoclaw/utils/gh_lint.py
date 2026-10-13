@@ -8,8 +8,12 @@ in milliseconds instead of after an author→solve→bake round-trip.
 Pure Python, no Rhino. Reused by `validate_gh_definition` (tool) and the
 future interactive author loop (NEXT-LEVEL 5.3).
 """
+import math
 import re
 from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from rhinoclaw.utils.gh_catalog import catalog_entry_with_authorability
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -65,6 +69,7 @@ def lint_definition(
     warnings: List[str] = []
     wires = wires or []
     guid_index = _catalog_index(catalog)
+    catalog_entries_by_component: Dict[int, Dict[str, Any]] = {}
 
     if not isinstance(components, list) or not components:
         return {"valid": False, "warnings": [],
@@ -102,11 +107,42 @@ def lint_definition(
                     "component catalog — look it up with find_gh_component "
                     "instead of guessing")
             elif entry is not None:
-                comp["_catalog"] = entry
+                candidate = catalog_entry_with_authorability(entry)
+                if not candidate["authorable"]:
+                    issue_codes = ", ".join(
+                        issue["code"] for issue in candidate["issues"]
+                    )
+                    errors.append(
+                        f"component '{label}': GUID {comp['guid']} is not "
+                        "authorable from the component catalog "
+                        f"(issues: {issue_codes}) — choose an authorable "
+                        "find_gh_component result")
+                else:
+                    # Lint is read-only. Keep the resolved catalog record in
+                    # local state instead of leaking a private `_catalog`
+                    # field into the caller's spec and eventual TCP payload.
+                    catalog_entries_by_component[id(comp)] = entry
                 if entry.get("obsolete"):
                     warnings.append(
                         f"component '{label}': '{entry.get('name')}' is "
                         "flagged OBSOLETE — prefer the current version")
+
+                reference_object_id = comp.get("reference_object_id")
+                if reference_object_id is not None:
+                    if entry.get("param_type") != "Curve":
+                        errors.append(
+                            f"component '{label}': reference_object_id is "
+                            "supported only for a standalone Curve parameter"
+                        )
+                    try:
+                        parsed_reference = UUID(str(reference_object_id))
+                        if parsed_reference.int == 0:
+                            raise ValueError("Guid.Empty")
+                    except (TypeError, ValueError, AttributeError):
+                        errors.append(
+                            f"component '{label}': reference_object_id must "
+                            "be a non-empty GUID"
+                        )
 
         if ctype in _SCRIPT_TYPES:
             for out in comp.get("extra_outputs") or []:
@@ -127,7 +163,18 @@ def lint_definition(
 
         if ctype == "slider":
             default = comp.get("default")
-            lo, hi = comp.get("min"), comp.get("max")
+            lo, hi = comp.get("min", 0), comp.get("max", 100)
+            if not all(isinstance(v, (float, int)) and not isinstance(v, bool) and math.isfinite(v)
+                       for v in (lo, hi)) or lo >= hi:
+                errors.append(f"slider '{label}': finite min < max required; use a Panel for a constant")
+                continue
+            decimals = comp.get("decimals", 1)
+            if not isinstance(decimals, int) or isinstance(decimals, bool) or not 0 <= decimals <= 12:
+                errors.append(f"slider '{label}': decimals must be an integer from 0 to 12")
+            if default is not None and (not isinstance(default, (int, float)) or isinstance(default, bool)
+                                        or not math.isfinite(default)):
+                errors.append(f"slider '{label}': default must be a finite number")
+                continue
             if default is not None and lo is not None and hi is not None \
                     and not (lo <= default <= hi):
                 warnings.append(
@@ -144,7 +191,7 @@ def lint_definition(
         if ctype in _PREVIEW_TYPES:
             return list(_PREVIEW_INPUTS), len(_PREVIEW_INPUTS)
         if ctype in _SDK_TYPES:
-            entry = comp.get("_catalog")
+            entry = catalog_entries_by_component.get(id(comp))
             if entry is None:
                 return None, None
             ports = entry.get("in") or []
@@ -156,7 +203,7 @@ def lint_definition(
         if ctype in _SCRIPT_TYPES:
             return _script_outputs(comp)
         if ctype in _SDK_TYPES:
-            entry = comp.get("_catalog")
+            entry = catalog_entries_by_component.get(id(comp))
             return _port_names(entry.get("out")) if entry else None
         return None  # sliders etc. emit their single value
 

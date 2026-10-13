@@ -4,8 +4,15 @@ from typing import Any, Dict, List, Optional
 from mcp.server.fastmcp import Context
 
 from rhinoclaw.server import get_rhino_connection, logger, mcp
-from rhinoclaw.utils.errors import ErrorCode
-from rhinoclaw.utils.responses import from_exception, ok
+from rhinoclaw.tools.find_gh_component import _catalog
+from rhinoclaw.utils.errors import ErrorCode, RhinoCommandError
+from rhinoclaw.utils.gh_catalog import (
+    authoring_catalog_contract,
+    catalog_verification_failure_data,
+    require_catalog_verification,
+)
+from rhinoclaw.utils.gh_lint import lint_definition
+from rhinoclaw.utils.responses import error, from_exception, ok
 
 
 @mcp.tool()
@@ -25,6 +32,12 @@ def build_and_bake_gh(
     `build_gh_definition` for the component/wire schema), solves it, and bakes
     the resulting geometry onto `layer`, returning the baked object GUIDs so a
     follow-up step can address them.
+
+    This is a geometry-only route, NOT a verified VisualARQ BIM workflow.
+    For actual Walls/Slabs/Spaces/Doors/Windows use the native va_create_*
+    tools, or author/load/solve a native VisualARQ graph and call
+    bake_grasshopper with exact output_targets and expected_visualarq_kind.
+    A successful Brep bake here does not prove any BIM product identity.
 
     ⚠️ LIMITATION (Rhino 8, verified 2026-06-04): Grasshopper **script
     components do NOT execute in headless solve** — confirmed for both the
@@ -78,6 +91,15 @@ def build_and_bake_gh(
             code=ErrorCode.INVALID_PARAMS
         ))
 
+    catalog = _catalog()
+    lint = lint_definition(components, wires, catalog=catalog)
+    if not lint["valid"]:
+        return json.dumps(error(
+            "Grasshopper build-and-bake failed static authoring preflight",
+            code=ErrorCode.INVALID_PARAMS,
+            data={"lint": lint},
+        ))
+
     try:
         rhino = get_rhino_connection()
 
@@ -87,6 +109,9 @@ def build_and_bake_gh(
             "wires": wires or [],
             "layer": layer,
             "bake_output": bake_output,
+            "catalog_contract": authoring_catalog_contract(
+                catalog, components
+            ),
         }
         if material is not None:
             params["material"] = material
@@ -94,6 +119,8 @@ def build_and_bake_gh(
             params["description"] = description
 
         result = rhino.send_command("build_and_bake_gh", params)
+        require_catalog_verification(result)
+        result["lint"] = lint
 
         status = result.get("status", "success")
         baked_count = result.get("baked_count", 0)
@@ -103,6 +130,16 @@ def build_and_bake_gh(
                     f"{baked_count} object(s) (status={status})",
             data=result,
         ))
+    except RhinoCommandError as e:
+        logger.error(f"Error building + baking Grasshopper definition: {str(e)}")
+        if e.error_code == ErrorCode.VERIFICATION_FAILED:
+            return json.dumps(error(
+                str(e),
+                code=ErrorCode.VERIFICATION_FAILED,
+                data=catalog_verification_failure_data(
+                    e, mutation_attempted=True),
+            ))
+        return json.dumps(from_exception(e, code=ErrorCode.RHINO_ERROR))
     except Exception as e:
         logger.error(f"Error building + baking Grasshopper definition: {str(e)}")
         return json.dumps(from_exception(e, code=ErrorCode.RHINO_ERROR))

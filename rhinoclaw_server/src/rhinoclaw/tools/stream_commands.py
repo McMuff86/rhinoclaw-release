@@ -41,7 +41,7 @@ async def connect_rhino_stream(ctx: Context) -> str:
         {"ok": true, "data": {"connected": true, "current_prompt": "Command:"}}
     
     Notes:
-        - Requires Rhino plugin running with mcpstart command
+        - Requires the Rhino plugin server to be running (ClawStart / ClawTcpStart)
         - Connection auto-reconnects on failure
         - Call disconnect_rhino_stream() when done
     """
@@ -66,7 +66,7 @@ async def connect_rhino_stream(ctx: Context) -> str:
                 data={
                     "connected": False,
                     "url": ws_client.url,
-                    "hint": "Make sure Rhino plugin is running (mcpstart)"
+                    "hint": "Make sure the Rhino plugin server is running (ClawStart)"
                 }
             ))
         
@@ -145,27 +145,39 @@ async def send_rhino_input(
             # Auto-connect if not connected
             await ws_client.start_listening()
         
-        success = await ws_client.send_input(value, timeout=timeout)
-        
-        if success:
+        outcome = await ws_client.send_input_detailed(value, timeout=timeout)
+        data = {
+            "value": value,
+            "sent": outcome["delivered"] or outcome["timed_out"],
+            "rhino_result": outcome["rhino_success"],
+            "confirmed": outcome["delivered"],
+            "current_prompt": ws_client.current_prompt,
+        }
+
+        if outcome["error"]:
+            # Nothing reached the command line (transport or plugin error).
+            data["sent"] = False
+            data["hint"] = "Nothing was sent. Reconnect with connect_rhino_stream and check that the plugin server is running."
+            return json.dumps(ok(message=f"Input not sent: {outcome['error']}", data=data))
+
+        if outcome["timed_out"]:
+            # RunScript blocks while an interactive command runs, so a missing
+            # confirmation usually means the command IS running (seen live
+            # 2026-10-06 with "! _vaSection", which opened its dialog while this
+            # tool reported "Failed to send input").
+            data["hint"] = ("No completion report within the timeout. The input was sent; an "
+                            "interactive command is most likely still running. Check "
+                            "get_command_history or get_ui_state before sending it again.")
+            return json.dumps(ok(message="Input sent, completion unconfirmed", data=data))
+
+        if outcome["rhino_success"]:
             logger.info(f"Sent input: {value}")
-            return json.dumps(ok(
-                message="Input sent successfully",
-                data={
-                    "sent": True,
-                    "value": value,
-                    "current_prompt": ws_client.current_prompt,
-                }
-            ))
-        else:
-            return json.dumps(ok(
-                message="Failed to send input",
-                data={
-                    "sent": False,
-                    "value": value,
-                    "hint": "Rhino may not be waiting for input"
-                }
-            ))
+            return json.dumps(ok(message="Input sent and completed successfully", data=data))
+
+        data["hint"] = ("Rhino ran the input but reported no success: the command was cancelled, "
+                        "is waiting for more input, or the macro started with '!' (cancel). "
+                        "Do not resend blindly; check get_command_history.")
+        return json.dumps(ok(message="Input delivered, Rhino reported it did not complete", data=data))
         
     except Exception as e:
         logger.error(f"Failed to send input: {e}")

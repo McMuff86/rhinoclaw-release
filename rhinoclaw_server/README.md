@@ -30,7 +30,7 @@ uv run python -m rhinoclaw
 uvx rhinoclaw
 ```
 
-**Note:** Start the Rhino plugin first (`mcpstart` in Rhino command line).
+**Note:** Start the Rhino plugin server first (`ClawStart` in the Rhino command line, or enable `ClawAutoStart`).
 
 ## Project Structure
 
@@ -53,7 +53,7 @@ rhinoclaw_server/
 
 ## Available Tools
 
-For the complete and up-to-date tool list, see [USAGE.md](../docs/USAGE.md).
+For the complete and up-to-date tool list, see [USAGE.md](https://github.com/McMuff86/RhinoClaw/blob/main/docs/USAGE.md).
 
 **Categories:**
 - **System**: ping, get_document_info, get_logs, set_debug_mode
@@ -84,4 +84,4 @@ uv publish
 
 - [Main README](../README.md) - Installation and usage
 - [AGENTS.md](../AGENTS.md) - Agent-focused guide
-- [USAGE.md](../docs/USAGE.md) - Tool reference and usage examples
+- [USAGE.md](https://github.com/McMuff86/RhinoClaw/blob/main/docs/USAGE.md) - Tool reference and usage examples
